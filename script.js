@@ -1,25 +1,35 @@
 /* ---------- Config ---------- */
 
 const SPECIES = {
-  cat:    { name:'Katt',   body:'#f4b183', ear:'#e8935a', pattern:'#c9754a', eyeType:'round'  },
-  dog:    { name:'Hund',   body:'#d8c39a', ear:'#b89566', pattern:'#8a6a45', eyeType:'round'  },
-  dragon: { name:'Drage',  body:'#7fd8a0', ear:'#4fae74', pattern:'#e0555f', eyeType:'slit'   },
-  bunny:  { name:'Kanin',  body:'#f3e3ee', ear:'#f2a8cf', pattern:'#e084b8', eyeType:'round'  },
+  cat:    { name:'Katt',   body:'#f4b183', ear:'#e8935a', pattern:'#c9754a', eyeType:'round', emoji:'🐱' },
+  dog:    { name:'Hund',   body:'#d8c39a', ear:'#b89566', pattern:'#8a6a45', eyeType:'round', emoji:'🐶' },
+  fox:    { name:'Rev',    body:'#e8873f', ear:'#2a2a2a', pattern:'#ffffff', eyeType:'slit',  emoji:'🦊' },
+  panda:  { name:'Panda',  body:'#f7f7f2', ear:'#2a2a2a', pattern:'#2a2a2a', eyeType:'round', emoji:'🐼' },
+  dragon: { name:'Drage',  body:'#7fd8a0', ear:'#4fae74', pattern:'#e0555f', eyeType:'slit',  emoji:'🐲' },
+  bunny:  { name:'Kanin',  body:'#f3e3ee', ear:'#f2a8cf', pattern:'#e084b8', eyeType:'round', emoji:'🐰' },
 };
 
-const GROWTH_HOURS = { baby:0, child:2, teen:8, adult:24 }; // hours since hatch
-const STAGE_SCALE   = { baby:0.55, child:0.75, teen:0.9, adult:1.05 };
+const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
 
-const DECAY_PER_HOUR = { hunger:8, hygiene:5, happiness:6, energy:4 };
+// Growth is driven by a care-weighted "growth progress" accumulator, not raw
+// wall-clock age - a well-loved pet grows noticeably faster than a neglected one.
+const GROWTH_UNITS = { baby:0, child:0.35, teen:1.4, adult:4 };
+const STAGE_SCALE  = { baby:0.42, child:0.68, teen:1.0, adult:1.4 };
+const GROWTH_ACTION_BONUS = 0.03;
+
+const DECAY_PER_HOUR = { hunger:13, hygiene:10, happiness:6, energy:4 };
 const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
+const PACIFIER_HAPPINESS_PER_HOUR = 40;
 
-const SAVE_KEY = 'petgame_save_v1';
+const SLOT_KEYS = ['petgame_save_slot1', 'petgame_save_slot2'];
+const ACTIVE_SLOT_KEY = 'petgame_active_slot';
+const LEGACY_SAVE_KEY = 'petgame_save_v1';
 
-const FOOD_EMOJI = { cat:'🐟', dog:'🦴', dragon:'🍖', bunny:'🥕' };
+const FOOD_EMOJI = { cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕' };
 const FULL_HUNGER_THRESHOLD = 92;
 
-const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000 };
+const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800 };
 
 const PLAY_VARIANTS = [
   { key:'bounce',   emoji:'⚽' },
@@ -34,15 +44,26 @@ const PLAY_VARIANTS = [
   { key:'jump',     emoji:'🪀' },
 ];
 
+const YAW_MAX = 1.1;
+
 /* ---------- State ---------- */
 
-let state = loadState();
+migrateLegacySave();
+let activeSlot = Number(localStorage.getItem(ACTIVE_SLOT_KEY)) || null;
+
+let state = activeSlot ? loadState() : defaultState();
 let audioCtx = null;
 let animFrame = 0;
 let eggShakeCount = 0;
 let eggWobble = 0;
 let selectedSpecies = null;
 let currentAction = null; // { type, variant, start, duration }
+let growthPulseUntil = 0;
+let petYaw = 0;
+let petYawTarget = 0;
+let isDraggingPet = false;
+let dragStartX = 0;
+let dragStartYaw = 0;
 
 /* ---------- DOM refs ---------- */
 
@@ -50,10 +71,13 @@ const el = {
   petName: document.getElementById('petName'),
   ageLabel: document.getElementById('ageLabel'),
   screens: {
+    slots: document.getElementById('screen-slots'),
     select: document.getElementById('screen-select'),
     egg: document.getElementById('screen-egg'),
     pet: document.getElementById('screen-pet'),
   },
+  slotGrid: document.getElementById('slotGrid'),
+  btnCloseSlots: document.getElementById('btn-closeSlots'),
   eggGrid: document.getElementById('eggGrid'),
   confirmSelect: document.getElementById('btn-confirmSelect'),
   canvasEgg: document.getElementById('canvas-egg'),
@@ -62,7 +86,7 @@ const el = {
   sleepOverlay: document.getElementById('sleepOverlay'),
   bubbleLayer: document.getElementById('bubbleLayer'),
   toast: document.getElementById('toast'),
-  soundIcon: document.getElementById('soundIcon'),
+  rotateHint: document.getElementById('rotateHint'),
   fills: {
     hunger: document.getElementById('fill-hunger'),
     energy: document.getElementById('fill-energy'),
@@ -76,11 +100,14 @@ const el = {
     happiness: document.getElementById('num-happiness'),
   },
   btnRestart: document.getElementById('btn-restart'),
+  btnJump: document.getElementById('btn-jump'),
+  btnCycle: document.getElementById('btn-cycle'),
+  btnBrush: document.getElementById('btn-brush'),
+  btnPacifier: document.getElementById('btn-pacifier'),
   btnFeed: document.getElementById('btn-feed'),
   btnPlay: document.getElementById('btn-play'),
   btnWash: document.getElementById('btn-wash'),
   btnSleep: document.getElementById('btn-sleep'),
-  btnSound: document.getElementById('btn-sound'),
 };
 
 /* ---------- Persistence ---------- */
@@ -91,26 +118,45 @@ function defaultState(){
     species:null,
     hatched:false,
     birthTime:null,
+    growthProgress:0,
     lastUpdate:Date.now(),
     sleeping:false,
+    pacifier:false,
     muted:false,
     stats:{ hunger:100, energy:100, hygiene:100, happiness:100 },
   };
 }
 
-function loadState(){
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    return Object.assign(defaultState(), parsed);
-  }catch(e){
-    return defaultState();
+function migrateLegacySave(){
+  const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
+  if(legacy){
+    if(!localStorage.getItem(SLOT_KEYS[0])){
+      localStorage.setItem(SLOT_KEYS[0], legacy);
+      localStorage.setItem(ACTIVE_SLOT_KEY, '1');
+    }
+    localStorage.removeItem(LEGACY_SAVE_KEY);
   }
 }
 
+function loadSlotRaw(slotIndex){
+  try{
+    const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){
+    return null;
+  }
+}
+
+function loadState(){
+  const parsed = loadSlotRaw(activeSlot);
+  if(!parsed) return defaultState();
+  return Object.assign(defaultState(), parsed);
+}
+
 function saveState(){
-  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  if(!activeSlot) return;
+  localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state));
 }
 
 /* ---------- Sound (Web Audio, synthesized) ---------- */
@@ -235,9 +281,29 @@ const SFX = {
       noiseBurst({ duration:0.05+Math.random()*0.03, freq:1300+Math.random()*900, q:3, type:'bandpass', vol:0.09, delay:0.35+i*0.14 });
     }
   },
+  jump: ()=>{
+    glide(300,520,0.16,'sine',0.16);
+    glide(520,340,0.16,'sine',0.12,0.18);
+  },
+  cycle: ()=>{
+    beep(1200,0.05,'square',0.06);
+    beep(1800,0.08,'square',0.07,0.07);
+    for(let i=0;i<9;i++){
+      noiseBurst({ duration:0.04, freq:280+Math.random()*120, q:2, type:'lowpass', vol:0.11, delay:0.3+i*0.16 });
+    }
+  },
+  brush: ()=>{
+    for(let i=0;i<10;i++){
+      noiseBurst({ duration:0.05, freq:3200+Math.random()*1200, q:4, type:'highpass', vol:0.08, delay:i*0.12 });
+    }
+    beep(1046,0.16,'sine',0.12,10*0.12+0.1);
+    beep(1318,0.18,'sine',0.1,10*0.12+0.22);
+  },
+  pacifierIn: ()=> glide(500,300,0.4,'sine',0.1),
+  pacifierOut: ()=>{ beep(700,0.1,'square',0.12); beep(900,0.12,'square',0.1,0.08); },
   sleep:    ()=> { beep(392,0.3,'sine',0.12); beep(330,0.35,'sine',0.1,0.2); },
   wake:     ()=> { beep(523,0.15,'sine',0.14); beep(659,0.18,'sine',0.14,0.1); },
-  grow:     ()=> { [523,659,784,1047].forEach((f,i)=>beep(f,0.18,'sine',0.15,i*0.09)); },
+  grow:     ()=> { [523,659,784,1047,1318].forEach((f,i)=>beep(f,0.2,'sine',0.16,i*0.09)); },
   low:      ()=> { beep(220,0.18,'sawtooth',0.12); },
 };
 
@@ -249,6 +315,84 @@ function toast(msg){
   el.toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=> el.toast.classList.remove('show'), 1600);
+}
+
+/* ---------- Slot picker ---------- */
+
+function renderSlotPicker(allowCancel){
+  const grid = el.slotGrid;
+  grid.innerHTML = '';
+  [1,2].forEach(slotIndex=>{
+    const raw = loadSlotRaw(slotIndex);
+    const card = document.createElement('div');
+    card.className = 'slotCard' + (slotIndex===activeSlot ? ' active' : '');
+
+    let emoji = '🥚', title = `Plass ${slotIndex}`, subtitle = 'Tom - start nytt eventyr';
+    if(raw && raw.species && SPECIES[raw.species]){
+      const sp = SPECIES[raw.species];
+      emoji = sp.emoji;
+      title = sp.name;
+      if(raw.phase === 'egg') subtitle = 'Egg, ikke klekket enda';
+      else if(raw.phase === 'pet') subtitle = STAGE_LABELS[stageFromProgress(raw.growthProgress||0)] || 'Aktivt kjæledyr';
+      else subtitle = 'Tom - start nytt eventyr';
+    }
+
+    const emojiEl = document.createElement('div');
+    emojiEl.className = 'slotEmoji';
+    emojiEl.textContent = emoji;
+
+    const info = document.createElement('div');
+    info.className = 'slotInfo';
+    info.innerHTML = `<div class="slotTitle">${title}</div><div class="slotSubtitle">${subtitle}</div>`;
+
+    card.appendChild(emojiEl);
+    card.appendChild(info);
+
+    if(raw){
+      const del = document.createElement('button');
+      del.className = 'slotDelete';
+      del.textContent = '🗑';
+      del.title = 'Slett denne lagringen';
+      del.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(confirm(`Slette lagringen på Plass ${slotIndex}? Dette kan ikke angres.`)){
+          localStorage.removeItem(SLOT_KEYS[slotIndex-1]);
+          if(slotIndex === activeSlot){
+            state = defaultState();
+          }
+          renderSlotPicker(allowCancel);
+        }
+      });
+      card.appendChild(del);
+    }
+
+    card.addEventListener('click', ()=> chooseSlot(slotIndex));
+    grid.appendChild(card);
+  });
+  el.btnCloseSlots.classList.toggle('hidden', !allowCancel);
+}
+
+function chooseSlot(slotIndex){
+  activeSlot = slotIndex;
+  localStorage.setItem(ACTIVE_SLOT_KEY, String(slotIndex));
+  state = loadState();
+  eggShakeCount = 0;
+  selectedSpecies = null;
+  currentAction = null;
+  lastStageSeen = null;
+  document.querySelectorAll('.eggChoice').forEach(n=>n.classList.remove('selected'));
+  el.confirmSelect.disabled = true;
+  applyElapsed();
+
+  if(state.phase === 'pet' && state.species){
+    showScreen('pet');
+    lastStageSeen = getStage();
+  } else if(state.phase === 'egg' && state.species){
+    showScreen('egg');
+    initEggScreen();
+  } else {
+    showScreen('select');
+  }
 }
 
 /* ---------- Egg selection screen ---------- */
@@ -375,6 +519,7 @@ function hatchEgg(){
   state.hatched = true;
   state.phase = 'pet';
   state.birthTime = Date.now();
+  state.growthProgress = 0;
   state.lastUpdate = Date.now();
   saveState();
   showScreen('pet');
@@ -384,13 +529,15 @@ function hatchEgg(){
 
 /* ---------- Pet rendering ---------- */
 
-function getStage(){
-  if(!state.birthTime) return 'baby';
-  const hours = (Date.now() - state.birthTime)/3600000;
-  if(hours >= GROWTH_HOURS.adult) return 'adult';
-  if(hours >= GROWTH_HOURS.teen) return 'teen';
-  if(hours >= GROWTH_HOURS.child) return 'child';
+function stageFromProgress(gp){
+  if(gp >= GROWTH_UNITS.adult) return 'adult';
+  if(gp >= GROWTH_UNITS.teen) return 'teen';
+  if(gp >= GROWTH_UNITS.child) return 'child';
   return 'baby';
+}
+
+function getStage(){
+  return stageFromProgress(state.growthProgress || 0);
 }
 
 let lastStageSeen = null;
@@ -440,10 +587,12 @@ function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
 
 function drawCreature(ctx, speciesKey, stage, opts={}){
   const sp = SPECIES[speciesKey];
-  const scale = STAGE_SCALE[stage] * 130;
+  const baseScale = STAGE_SCALE[stage] * 130;
   const sad = opts.sad;
   const asleep = opts.asleep;
+  const pacifier = opts.pacifier && !asleep;
   const action = opts.action;
+  const yaw = opts.yaw || 0;
 
   let extraTX=0, extraTY=0, extraRotate=0, extraScaleX=1, extraScaleY=1;
   let chompProgress = null;
@@ -464,6 +613,20 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
       const happyEnv = Math.sin(((action.progress-0.75)/0.25)*Math.PI);
       extraTY = -happyEnv*10;
     }
+  } else if(action && action.type==='jump'){
+    const hopPhase = (action.progress*2) % 1;
+    extraTY = -50*Math.sin(hopPhase*Math.PI);
+    extraScaleX = 1 + 0.08*Math.sin(hopPhase*Math.PI);
+  } else if(action && action.type==='cycle'){
+    extraRotate = 0.08 + Math.sin(action.progress*Math.PI*10)*0.05;
+    extraTY = Math.abs(Math.sin(action.progress*Math.PI*10))*4;
+  }
+
+  let pulseScale = 1;
+  const pulseRemaining = growthPulseUntil - performance.now();
+  if(pulseRemaining > 0){
+    const p = 1 - pulseRemaining/700;
+    pulseScale = 1 + Math.sin(Math.min(p,1)*Math.PI)*0.3;
   }
 
   const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*4;
@@ -472,25 +635,30 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   ctx.save();
   ctx.translate(180+extraTX, 200+bounce+extraTY);
   ctx.rotate(extraRotate);
-  ctx.scale((scale/100)*extraScaleX, (scale/100)*extraScaleY);
+  ctx.scale((baseScale/100)*extraScaleX*pulseScale*Math.cos(yaw), (baseScale/100)*extraScaleY*pulseScale);
 
-  // tail (dragon/cat/dog)
-  if(speciesKey==='dragon'){
+  drawTail(ctx, speciesKey, sp, stage);
+
+  // bicycle (drawn behind/below the body)
+  if(action && action.type==='cycle'){
+    const wheelRot = action.progress*Math.PI*10;
+    ctx.strokeStyle = '#c0392b';
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(45,20);
-    ctx.quadraticCurveTo(90,10,95,-30);
-    ctx.lineWidth=18;
-    ctx.strokeStyle = sp.body;
-    ctx.lineCap='round';
+    ctx.moveTo(-30,60); ctx.lineTo(0,32); ctx.lineTo(30,60);
     ctx.stroke();
-  } else if(speciesKey==='dog'){
-    ctx.beginPath();
-    ctx.moveTo(48,10);
-    ctx.quadraticCurveTo(75,-10,72,-35);
-    ctx.lineWidth=14;
-    ctx.strokeStyle = sp.ear;
-    ctx.lineCap='round';
-    ctx.stroke();
+    [-30,30].forEach(wx=>{
+      ctx.save();
+      ctx.translate(wx, 62);
+      ctx.rotate(wheelRot);
+      ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2);
+      ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=3; ctx.stroke();
+      for(let s=0;s<4;s++){
+        ctx.beginPath(); ctx.moveTo(-15,0); ctx.lineTo(15,0); ctx.stroke();
+        ctx.rotate(Math.PI/4);
+      }
+      ctx.restore();
+    });
   }
 
   // body
@@ -508,17 +676,49 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   // ears
   drawEars(ctx, speciesKey, sp);
 
-  // dragon back spikes
-  if(speciesKey==='dragon' && (stage==='teen'||stage==='adult')){
-    ctx.fillStyle = sp.pattern;
-    for(let i=-1;i<=1;i++){
-      ctx.beginPath();
-      ctx.moveTo(i*16-6,-40);
-      ctx.lineTo(i*16,-56);
-      ctx.lineTo(i*16+6,-40);
-      ctx.closePath();
-      ctx.fill();
+  // dragon back spikes / wings
+  if(speciesKey==='dragon'){
+    if(stage==='teen'||stage==='adult'){
+      ctx.fillStyle = sp.pattern;
+      for(let i=-1;i<=1;i++){
+        ctx.beginPath();
+        ctx.moveTo(i*16-6,-40);
+        ctx.lineTo(i*16,-56);
+        ctx.lineTo(i*16+6,-40);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
+    [-1,1].forEach(dir=>{
+      ctx.beginPath();
+      ctx.moveTo(dir*40,0);
+      ctx.quadraticCurveTo(dir*90,-10,dir*70,20);
+      ctx.quadraticCurveTo(dir*55,10,dir*40,0);
+      ctx.closePath();
+      ctx.fillStyle='rgba(127,216,160,0.55)';
+      ctx.fill();
+      ctx.strokeStyle='rgba(79,174,116,0.6)';
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+    });
+  }
+
+  // panda eye patches (drawn before eyes so eyes render on top)
+  if(speciesKey==='panda' && !closedEyes){
+    ctx.fillStyle = sp.ear;
+    [-1,1].forEach(dir=>{
+      ctx.beginPath();
+      ctx.ellipse(dir*20,-8,11,13,dir*0.15,0,Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  // fox / dog muzzle (light patch + protruding snout)
+  if((speciesKey==='fox' || speciesKey==='dog') && !pacifier){
+    ctx.beginPath();
+    ctx.ellipse(0,16,17,13,0,0,Math.PI*2);
+    ctx.fillStyle = speciesKey==='fox' ? '#fff8ee' : 'rgba(255,255,255,0.55)';
+    ctx.fill();
   }
 
   // face
@@ -526,6 +726,10 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   const eyeDX = 20;
   const blink = (blinkPhase>0.92);
   const annoyed = sad || (action && action.type==='refuse');
+  const faceShift = Math.sin(yaw)*6;
+
+  ctx.save();
+  ctx.translate(faceShift, 0);
 
   if(closedEyes || blink){
     ctx.strokeStyle='#3a2a20';
@@ -558,6 +762,20 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     });
   }
 
+  // whiskers (cat)
+  if(speciesKey==='cat' && !closedEyes){
+    ctx.strokeStyle='rgba(60,40,30,0.45)';
+    ctx.lineWidth=1.3;
+    [-1,1].forEach(dir=>{
+      for(let i=-1;i<=1;i++){
+        ctx.beginPath();
+        ctx.moveTo(dir*30, 14+i*4);
+        ctx.lineTo(dir*48, 10+i*6);
+        ctx.stroke();
+      }
+    });
+  }
+
   // eyebrows if sad or refusing
   if(annoyed && !closedEyes){
     ctx.strokeStyle='rgba(0,0,0,0.4)';
@@ -570,30 +788,45 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     });
   }
 
-  // nose + mouth
-  ctx.fillStyle='#3a2a20';
-  ctx.beginPath();
-  ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  ctx.strokeStyle='#3a2a20';
-  ctx.lineWidth=2.5;
-  ctx.lineCap='round';
-  ctx.beginPath();
-  if(asleep){
-    ctx.moveTo(-6,14); ctx.lineTo(6,14);
-  } else if(action && action.type==='eat' && chompProgress<1){
-    const mouthOpen = Math.abs(Math.sin(chompProgress*Math.PI*4))*8;
-    ctx.moveTo(-9,12);
-    ctx.quadraticCurveTo(0,16+mouthOpen,9,12);
-  } else if(annoyed){
-    ctx.moveTo(-9,18);
-    ctx.quadraticCurveTo(0,10,9,18);
+  if(pacifier){
+    drawEmojiOverlay(ctx, '🍼', 0, 14, 30, 1);
   } else {
-    ctx.moveTo(-9,12);
-    ctx.quadraticCurveTo(0,22,9,12);
+    // nose + mouth
+    ctx.fillStyle='#3a2a20';
+    ctx.beginPath();
+    ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle='#3a2a20';
+    ctx.lineWidth=2.5;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    if(asleep){
+      ctx.moveTo(-6,14); ctx.lineTo(6,14);
+    } else if(action && action.type==='eat' && chompProgress<1){
+      const mouthOpen = Math.abs(Math.sin(chompProgress*Math.PI*4))*8;
+      ctx.moveTo(-9,12);
+      ctx.quadraticCurveTo(0,16+mouthOpen,9,12);
+    } else if(annoyed){
+      ctx.moveTo(-9,18);
+      ctx.quadraticCurveTo(0,10,9,18);
+    } else {
+      ctx.moveTo(-9,12);
+      ctx.quadraticCurveTo(0,22,9,12);
+    }
+    ctx.stroke();
+
+    // bunny teeth
+    if(speciesKey==='bunny' && !annoyed && !asleep){
+      ctx.fillStyle='#fff';
+      ctx.fillRect(-4,15,3.5,6);
+      ctx.fillRect(0.5,15,3.5,6);
+      ctx.strokeStyle='rgba(0,0,0,0.15)';
+      ctx.lineWidth=0.5;
+      ctx.strokeRect(-4,15,3.5,6);
+      ctx.strokeRect(0.5,15,3.5,6);
+    }
   }
-  ctx.stroke();
 
   // cheeks
   ctx.fillStyle='rgba(255,120,140,0.35)';
@@ -603,7 +836,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.fill();
   });
 
-  // action overlays (food, soap)
+  // action overlays (food, soap, toothbrush)
   if(action && action.type==='eat'){
     const foodEmoji = FOOD_EMOJI[speciesKey] || '🍎';
     if(chompProgress<1){
@@ -626,9 +859,72 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     });
     const spongeX = Math.sin(p*Math.PI*6)*36;
     drawEmojiOverlay(ctx, '🧽', spongeX, 4, 26, 1);
+  } else if(action && action.type==='brush'){
+    const bx = Math.sin(action.progress*Math.PI*12)*8;
+    drawEmojiOverlay(ctx, '🪥', 4+bx, 8, 26, 1);
+    if(action.progress>0.8){
+      drawEmojiOverlay(ctx, '✨', 22, -18, 18, 1);
+    }
   }
 
-  ctx.restore();
+  ctx.restore(); // face shift
+
+  ctx.restore(); // main transform
+}
+
+function drawTail(ctx, speciesKey, sp, stage){
+  if(speciesKey==='dragon'){
+    ctx.beginPath();
+    ctx.moveTo(45,20);
+    ctx.quadraticCurveTo(90,10,95,-30);
+    ctx.lineWidth=18;
+    ctx.strokeStyle = sp.body;
+    ctx.lineCap='round';
+    ctx.stroke();
+    if(stage==='teen'||stage==='adult'){
+      ctx.fillStyle = sp.pattern;
+      ctx.beginPath();
+      ctx.moveTo(95,-30); ctx.lineTo(88,-42); ctx.lineTo(100,-38);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if(speciesKey==='dog'){
+    ctx.beginPath();
+    ctx.moveTo(48,10);
+    ctx.quadraticCurveTo(75,-10,72,-35);
+    ctx.lineWidth=14;
+    ctx.strokeStyle = sp.ear;
+    ctx.lineCap='round';
+    ctx.stroke();
+  } else if(speciesKey==='cat'){
+    ctx.beginPath();
+    ctx.moveTo(46,22);
+    ctx.quadraticCurveTo(78,20,80,-8);
+    ctx.quadraticCurveTo(82,-24,68,-24);
+    ctx.lineWidth=13;
+    ctx.strokeStyle = sp.body;
+    ctx.lineCap='round';
+    ctx.stroke();
+  } else if(speciesKey==='fox'){
+    ctx.beginPath();
+    ctx.ellipse(78,10,32,17,-0.5,0,Math.PI*2);
+    ctx.fillStyle = sp.body;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(96,4,11,8,-0.5,0,Math.PI*2);
+    ctx.fillStyle = '#fff8ee';
+    ctx.fill();
+  } else if(speciesKey==='panda'){
+    ctx.beginPath();
+    ctx.arc(50,32,9,0,Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  } else if(speciesKey==='bunny'){
+    ctx.beginPath();
+    ctx.arc(48,28,10,0,Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
 }
 
 function drawEars(ctx, speciesKey, sp){
@@ -641,11 +937,49 @@ function drawEars(ctx, speciesKey, sp){
       ctx.lineTo(dir*20,-46);
       ctx.closePath();
       ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(dir*33,-33);
+      ctx.lineTo(dir*44,-54);
+      ctx.lineTo(dir*25,-45);
+      ctx.closePath();
+      ctx.fillStyle = sp.pattern;
+      ctx.fill();
+      ctx.fillStyle = sp.ear;
     });
   } else if(speciesKey==='dog'){
     [-1,1].forEach(dir=>{
       ctx.beginPath();
       ctx.ellipse(dir*44,-24,13,26,dir*0.4,0,Math.PI*2);
+      ctx.fill();
+    });
+  } else if(speciesKey==='fox'){
+    [-1,1].forEach(dir=>{
+      ctx.beginPath();
+      ctx.moveTo(dir*30,-32);
+      ctx.lineTo(dir*48,-72);
+      ctx.lineTo(dir*16,-44);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#2a2a2a';
+      ctx.beginPath();
+      ctx.moveTo(dir*44,-64);
+      ctx.lineTo(dir*48,-72);
+      ctx.lineTo(dir*38,-58);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(dir*32,-36);
+      ctx.lineTo(dir*40,-58);
+      ctx.lineTo(dir*22,-42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = sp.ear;
+    });
+  } else if(speciesKey==='panda'){
+    [-1,1].forEach(dir=>{
+      ctx.beginPath();
+      ctx.arc(dir*38,-42,17,0,Math.PI*2);
       ctx.fill();
     });
   } else if(speciesKey==='dragon'){
@@ -669,6 +1003,28 @@ function drawEars(ctx, speciesKey, sp){
       ctx.fillStyle = sp.ear;
     });
   }
+}
+
+/* ---------- Pet drag-to-rotate ---------- */
+
+function setupPetDrag(){
+  const canvas = el.canvasPet;
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(state.phase !== 'pet') return;
+    isDraggingPet = true;
+    dragStartX = e.clientX;
+    dragStartYaw = petYawTarget;
+    try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+    el.rotateHint.classList.add('hidden');
+  });
+  canvas.addEventListener('pointermove', (e)=>{
+    if(!isDraggingPet) return;
+    const dx = e.clientX - dragStartX;
+    petYawTarget = Math.max(-YAW_MAX, Math.min(YAW_MAX, dragStartYaw + dx*0.012));
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(evt=>{
+    canvas.addEventListener(evt, ()=>{ isDraggingPet = false; });
+  });
 }
 
 /* ---------- Effects ---------- */
@@ -722,7 +1078,10 @@ function spawnBubbles(n=10){
 
 /* ---------- Screen switching ---------- */
 
+let lastNonSlotScreen = 'select';
+
 function showScreen(name){
+  if(name !== 'slots') lastNonSlotScreen = name;
   Object.entries(el.screens).forEach(([k,node])=>{
     node.classList.toggle('hidden', k!==name);
   });
@@ -732,6 +1091,14 @@ function showScreen(name){
 /* ---------- Stat update / decay ---------- */
 
 function clamp(v){ return Math.max(0, Math.min(100, v)); }
+
+function updateGrowth(hours){
+  if(hours <= 0) return;
+  let mult = 1;
+  if(state.stats.happiness >= 90) mult = 2.2;
+  else if(state.stats.happiness >= 70) mult = 1.5;
+  state.growthProgress = (state.growthProgress||0) + hours*mult;
+}
 
 function applyElapsed(){
   if(state.phase !== 'pet') { state.lastUpdate = Date.now(); return; }
@@ -749,10 +1116,15 @@ function applyElapsed(){
     s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours);
     s.energy = clamp(s.energy - DECAY_PER_HOUR.energy*hours);
     s.hygiene = clamp(s.hygiene - DECAY_PER_HOUR.hygiene*hours);
-    let happinessDrop = DECAY_PER_HOUR.happiness*hours;
-    if(s.hunger<25 || s.hygiene<25 || s.energy<20) happinessDrop *= 1.6;
-    s.happiness = clamp(s.happiness - happinessDrop);
+    if(state.pacifier){
+      s.happiness = clamp(s.happiness + PACIFIER_HAPPINESS_PER_HOUR*hours);
+    } else {
+      let happinessDrop = DECAY_PER_HOUR.happiness*hours;
+      if(s.hunger<25 || s.hygiene<25 || s.energy<20) happinessDrop *= 1.6;
+      s.happiness = clamp(s.happiness - happinessDrop);
+    }
   }
+  updateGrowth(hours);
   state.lastUpdate = now;
 }
 
@@ -761,7 +1133,8 @@ function refreshStatBars(){
     const v = Math.round(state.stats[key]*10)/10;
     const vRounded = Math.round(v);
     node.style.width = vRounded+'%';
-    node.style.background = vRounded<25 ? 'var(--bad)' : (vRounded<55 ? 'var(--mid)' : 'var(--good)');
+    node.classList.toggle('bad', vRounded<25);
+    node.classList.toggle('mid', vRounded>=25 && vRounded<55);
     el.nums[key].textContent = v.toFixed(1)+'%';
   });
 }
@@ -775,6 +1148,7 @@ function isNeedy(){
 
 function doFeed(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
 
   if(state.stats.hunger >= FULL_HUNGER_THRESHOLD){
@@ -788,12 +1162,14 @@ function doFeed(){
   SFX.eat();
   state.stats.hunger = clamp(state.stats.hunger+30);
   state.stats.happiness = clamp(state.stats.happiness+8);
+  state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS;
   saveState();
   setTimeout(()=>{ toast('Nam nam, godt mett! 😋'); spawnSparkles(5); }, ACTION_DURATIONS.eat*0.72);
 }
 
 function doPlay(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
   if(state.stats.energy < 10) return toast('For sliten til å leke 😴');
 
@@ -804,12 +1180,14 @@ function doPlay(){
   state.stats.happiness = clamp(state.stats.happiness+25);
   state.stats.energy = clamp(state.stats.energy-7);
   state.stats.hunger = clamp(state.stats.hunger-8);
+  state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS;
   toast('Så gøy! '+variant.emoji);
   saveState();
 }
 
 function doWash(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
 
   triggerAction('wash');
@@ -821,7 +1199,67 @@ function doWash(){
   setTimeout(()=>{ toast('Skinnende ren! 🧼✨'); }, ACTION_DURATIONS.wash*0.8);
 }
 
+function doJump(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
+  if(currentAction) return;
+  if(state.stats.energy < 8) return toast('For sliten til å hoppe 😴');
+
+  triggerAction('jump');
+  SFX.jump();
+  spawnEmojiBurst('✨', 4);
+  state.stats.happiness = clamp(state.stats.happiness+14);
+  state.stats.energy = clamp(state.stats.energy-6);
+  state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS;
+  toast('Hopp hopp! 🤸');
+  saveState();
+}
+
+function doCycle(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
+  if(currentAction) return;
+  if(state.stats.energy < 15) return toast('For sliten til å sykle 😴');
+
+  triggerAction('cycle');
+  SFX.cycle();
+  spawnEmojiBurst('🚲', 4);
+  state.stats.happiness = clamp(state.stats.happiness+22);
+  state.stats.energy = clamp(state.stats.energy-14);
+  state.stats.hygiene = clamp(state.stats.hygiene-10);
+  state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS*1.3;
+  toast('Sykkeltur! 🚲');
+  saveState();
+}
+
+function doBrushTeeth(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
+  if(currentAction) return;
+
+  triggerAction('brush');
+  SFX.brush();
+  state.stats.hygiene = clamp(state.stats.hygiene+22);
+  state.stats.happiness = clamp(state.stats.happiness+5);
+  saveState();
+  setTimeout(()=>{ toast('Skinnende rene tenner! 🪥✨'); spawnSparkles(4); }, ACTION_DURATIONS.brush*0.7);
+}
+
+function doTogglePacifier(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  state.pacifier = !state.pacifier;
+  if(state.pacifier){ SFX.pacifierIn(); toast('God og rolig 🍼'); }
+  else { SFX.pacifierOut(); toast('Smokk ut!'); }
+  saveState();
+  refreshPacifierUI();
+}
+
+function refreshPacifierUI(){
+  el.btnPacifier.classList.toggle('activeToggle', !!state.pacifier);
+}
+
 function doToggleSleep(){
+  if(state.pacifier) return toast('Ta ut smokken først 🍼');
   state.sleeping = !state.sleeping;
   if(state.sleeping){ SFX.sleep(); toast('God natt 🌙'); }
   else { SFX.wake(); toast('God morgen! ☀️'); }
@@ -834,37 +1272,17 @@ function refreshSleepUI(){
   el.sleepOverlay.textContent = state.sleeping ? '💤' : '';
 }
 
-function resetGame(){
-  const ok = confirm('Starte på nytt med et nytt kjæledyr? Fremgangen for det nåværende kjæledyret blir slettet.');
-  if(!ok) return;
-
-  currentAction = null;
-  eggShakeCount = 0;
-  eggWobble = 0;
-  selectedSpecies = null;
-  lastStageSeen = null;
-  state = defaultState();
-  saveState();
-
-  document.querySelectorAll('.eggChoice').forEach(n=>n.classList.remove('selected'));
-  el.confirmSelect.disabled = true;
-  el.sleepOverlay.classList.add('hidden');
-  showScreen('select');
-}
-
-function doToggleSound(){
-  state.muted = !state.muted;
-  el.soundIcon.textContent = state.muted ? '🔇' : '🔊';
-  saveState();
-  if(!state.muted) SFX.tap();
-}
-
 /* ---------- Main loop ---------- */
 
 function tick(){
   animFrame++;
   bounceTime += 0.03;
   blinkPhase = (blinkPhase+0.01) % 1;
+
+  if(!isDraggingPet){
+    petYawTarget *= 0.93;
+  }
+  petYaw += (petYawTarget - petYaw) * 0.25;
 
   if(state.phase === 'pet'){
     applyElapsed();
@@ -874,21 +1292,26 @@ function tick(){
     if(lastStageSeen && stage !== lastStageSeen){
       SFX.grow();
       toast(`${SPECIES[state.species].name} har vokst! 🌱`);
-      spawnSparkles(10);
+      spawnSparkles(14);
+      growthPulseUntil = performance.now() + 700;
     }
     lastStageSeen = stage;
 
     const ctx = el.canvasPet.getContext('2d');
     ctx.clearRect(0,0,el.canvasPet.width, el.canvasPet.height);
-    drawCreature(ctx, state.species, stage, { sad:isNeedy(), asleep:state.sleeping, action:getActionProgress() });
+    drawCreature(ctx, state.species, stage, {
+      sad:isNeedy(), asleep:state.sleeping, pacifier:state.pacifier,
+      action:getActionProgress(), yaw:petYaw,
+    });
 
     const hours = state.birthTime ? (Date.now()-state.birthTime)/3600000 : 0;
     const days = Math.floor(hours/24);
     const hrs = Math.floor(hours%24);
-    el.petName.textContent = `${SPECIES[state.species].name} • ${stage==='baby'?'Baby':stage==='child'?'Barn':stage==='teen'?'Tenåring':'Voksen'}`;
+    el.petName.textContent = `${SPECIES[state.species].name} • ${STAGE_LABELS[stage]}`;
     el.ageLabel.textContent = days>0 ? `${days}d ${hrs}t gammel` : `${hrs}t gammel`;
 
     refreshSleepUI();
+    refreshPacifierUI();
     el.btnSleep.querySelector('.icon').textContent = state.sleeping ? '☀️' : '💤';
     el.btnSleep.querySelector('.label').textContent = state.sleeping ? 'Våkne' : 'Sov';
   }
@@ -900,6 +1323,7 @@ function tick(){
 
 function init(){
   buildEggGrid();
+  setupPetDrag();
 
   el.confirmSelect.addEventListener('click', ()=>{
     if(!selectedSpecies) return;
@@ -915,14 +1339,25 @@ function init(){
   el.btnPlay.addEventListener('click', doPlay);
   el.btnWash.addEventListener('click', doWash);
   el.btnSleep.addEventListener('click', doToggleSleep);
-  el.btnSound.addEventListener('click', doToggleSound);
-  el.btnRestart.addEventListener('click', resetGame);
+  el.btnJump.addEventListener('click', doJump);
+  el.btnCycle.addEventListener('click', doCycle);
+  el.btnBrush.addEventListener('click', doBrushTeeth);
+  el.btnPacifier.addEventListener('click', doTogglePacifier);
 
-  el.soundIcon.textContent = state.muted ? '🔇' : '🔊';
+  el.btnRestart.addEventListener('click', ()=>{
+    renderSlotPicker(true);
+    showScreen('slots');
+  });
+  el.btnCloseSlots.addEventListener('click', ()=>{
+    showScreen(lastNonSlotScreen);
+  });
 
   applyElapsed();
 
-  if(state.phase === 'pet' && state.species){
+  if(!activeSlot){
+    renderSlotPicker(false);
+    showScreen('slots');
+  } else if(state.phase === 'pet' && state.species){
     showScreen('pet');
     lastStageSeen = getStage();
   } else if(state.phase === 'egg' && state.species){

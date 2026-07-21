@@ -19,9 +19,9 @@
 
     <!-- TOPBAR -->
     <header id="topbar">
-      <button id="btn-restart" title="Start på nytt">↺</button>
       <div id="petName">Kjæledyr-egg</div>
       <div id="ageLabel"></div>
+      <button id="btn-restart" title="Bytt / slett lagring">⋮</button>
     </header>
 
     <!-- STATS -->
@@ -51,8 +51,16 @@
     <!-- STAGE (screens) -->
     <main id="stage">
 
+      <!-- SLOT PICKER SCREEN -->
+      <section id="screen-slots" class="screen hidden">
+        <h1>Lagringsplasser</h1>
+        <p class="subtitle">Velg en plass å spille på</p>
+        <div id="slotGrid"></div>
+        <button id="btn-closeSlots" class="bigButton ghostButton hidden">Avbryt</button>
+      </section>
+
       <!-- SELECT SCREEN -->
-      <section id="screen-select" class="screen">
+      <section id="screen-select" class="screen hidden">
         <h1>Velg egget ditt</h1>
         <p class="subtitle">Hvert egg skjuler et annet dyr</p>
         <div id="eggGrid"></div>
@@ -72,6 +80,7 @@
           <div id="sleepOverlay" class="hidden"></div>
           <div id="bubbleLayer"></div>
           <div id="toast"></div>
+          <div id="rotateHint">↔ dra for å snu</div>
         </div>
       </section>
 
@@ -79,21 +88,34 @@
 
     <!-- ACTION BAR -->
     <nav id="actions" class="hidden">
-      <button class="actionBtn" id="btn-feed" title="Mat">
-        <span class="icon">🍖</span><span class="label">Mat</span>
-      </button>
-      <button class="actionBtn" id="btn-play" title="Lek">
-        <span class="icon">🎾</span><span class="label">Lek</span>
-      </button>
-      <button class="actionBtn" id="btn-wash" title="Vask">
-        <span class="icon">🧼</span><span class="label">Vask</span>
-      </button>
-      <button class="actionBtn" id="btn-sleep" title="Sov">
-        <span class="icon">💤</span><span class="label">Sov</span>
-      </button>
-      <button class="actionBtn" id="btn-sound" title="Lyd">
-        <span class="icon" id="soundIcon">🔊</span><span class="label">Lyd</span>
-      </button>
+      <div class="actionRow">
+        <button class="actionBtn" id="btn-jump" title="Hopp">
+          <span class="icon">🤸</span><span class="label">Hopp</span>
+        </button>
+        <button class="actionBtn" id="btn-cycle" title="Sykle">
+          <span class="icon">🚲</span><span class="label">Sykle</span>
+        </button>
+        <button class="actionBtn" id="btn-brush" title="Puss tenna">
+          <span class="icon">🪥</span><span class="label">Tenner</span>
+        </button>
+        <button class="actionBtn" id="btn-pacifier" title="Smokk">
+          <span class="icon">🍼</span><span class="label">Smokk</span>
+        </button>
+      </div>
+      <div class="actionRow">
+        <button class="actionBtn" id="btn-feed" title="Mat">
+          <span class="icon">🍖</span><span class="label">Mat</span>
+        </button>
+        <button class="actionBtn" id="btn-play" title="Lek">
+          <span class="icon">🎾</span><span class="label">Lek</span>
+        </button>
+        <button class="actionBtn" id="btn-wash" title="Vask">
+          <span class="icon">🧼</span><span class="label">Vask</span>
+        </button>
+        <button class="actionBtn" id="btn-sleep" title="Sov">
+          <span class="icon">💤</span><span class="label">Sov</span>
+        </button>
+      </div>
     </nav>
 
   </div>
