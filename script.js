@@ -631,7 +631,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   const baseScale = STAGE_SCALE[stage] * 130;
   const sad = opts.sad;
   const asleep = opts.asleep;
-  const pacifier = opts.pacifier && !asleep;
+  const pacifier = opts.pacifier;
   const action = opts.action;
   const yaw = opts.yaw || 0;
 
