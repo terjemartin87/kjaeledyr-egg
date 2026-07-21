@@ -944,8 +944,26 @@ window.addEventListener('beforeunload', saveState);
 window.addEventListener('pagehide', saveState);
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState === 'hidden') saveState();
+  if(document.visibilityState === 'visible') requestWakeLock();
 });
 setInterval(saveState, 2000);
+
+/* ---------- Keep screen awake while the game is open ---------- */
+
+let wakeLock = null;
+
+async function requestWakeLock(){
+  if(!('wakeLock' in navigator)) return;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+  }catch(e){
+    // ignored: e.g. blocked by low battery mode - not critical
+  }
+}
+
+window.addEventListener('load', requestWakeLock);
+el.actions.addEventListener('click', ()=>{ if(!wakeLock) requestWakeLock(); });
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
