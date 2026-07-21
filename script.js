@@ -27,7 +27,7 @@ const STAGE_PROFILE = {
   adult: { bodyRX:1.18, bodyRY:0.88, eyeScale:0.85, eyeSpread:1.05, earScale:1.15, tailScale:1.15,features:true  },
 };
 
-const DECAY_PER_HOUR = { hunger:13, hygiene:10, happiness:6, energy:4 };
+const DECAY_PER_HOUR = { hunger:20, hygiene:10, happiness:6, energy:4 };
 const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
 const PACIFIER_HAPPINESS_PER_HOUR = 40;
@@ -1255,6 +1255,7 @@ function doJump(){
   spawnEmojiBurst('✨', 4);
   state.stats.happiness = clamp(state.stats.happiness+14);
   state.stats.energy = clamp(state.stats.energy-6);
+  state.stats.hunger = clamp(state.stats.hunger-6);
   state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS;
   toast('Hopp hopp! 🤸');
   saveState();
@@ -1271,6 +1272,7 @@ function doCycle(){
   state.stats.happiness = clamp(state.stats.happiness+22);
   state.stats.energy = clamp(state.stats.energy-14);
   state.stats.hygiene = clamp(state.stats.hygiene-10);
+  state.stats.hunger = clamp(state.stats.hunger-12);
   state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS*1.3;
   toast('Sykkeltur! 🚲');
   saveState();
