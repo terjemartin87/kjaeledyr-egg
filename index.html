@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Kjæledyr-egg 🥚</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="theme-color" content="#23262f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Kjæledyr" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="device">
+
+    <!-- TOPBAR -->
+    <header id="topbar">
+      <button id="btn-restart" title="Start på nytt">↺</button>
+      <div id="petName">Kjæledyr-egg</div>
+      <div id="ageLabel"></div>
+    </header>
+
+    <!-- STATS -->
+    <div id="stats">
+      <div class="statRow">
+        <span class="statIcon">🍖</span>
+        <div class="statBar"><div class="statFill" id="fill-hunger"></div></div>
+        <span class="statNum" id="num-hunger"></span>
+      </div>
+      <div class="statRow">
+        <span class="statIcon">⚡</span>
+        <div class="statBar"><div class="statFill" id="fill-energy"></div></div>
+        <span class="statNum" id="num-energy"></span>
+      </div>
+      <div class="statRow">
+        <span class="statIcon">🧼</span>
+        <div class="statBar"><div class="statFill" id="fill-hygiene"></div></div>
+        <span class="statNum" id="num-hygiene"></span>
+      </div>
+      <div class="statRow">
+        <span class="statIcon">😊</span>
+        <div class="statBar"><div class="statFill" id="fill-happiness"></div></div>
+        <span class="statNum" id="num-happiness"></span>
+      </div>
+    </div>
+
+    <!-- STAGE (screens) -->
+    <main id="stage">
+
+      <!-- SELECT SCREEN -->
+      <section id="screen-select" class="screen">
+        <h1>Velg egget ditt</h1>
+        <p class="subtitle">Hvert egg skjuler et annet dyr</p>
+        <div id="eggGrid"></div>
+        <button id="btn-confirmSelect" class="bigButton" disabled>Start eventyret</button>
+      </section>
+
+      <!-- EGG SCREEN -->
+      <section id="screen-egg" class="screen hidden">
+        <canvas id="canvas-egg" width="320" height="320"></canvas>
+        <p class="hint">Trykk på egget for å riste på det!</p>
+      </section>
+
+      <!-- PET SCREEN -->
+      <section id="screen-pet" class="screen hidden">
+        <div id="petViewport">
+          <canvas id="canvas-pet" width="360" height="360"></canvas>
+          <div id="sleepOverlay" class="hidden"></div>
+          <div id="bubbleLayer"></div>
+          <div id="toast"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ACTION BAR -->
+    <nav id="actions" class="hidden">
+      <button class="actionBtn" id="btn-feed" title="Mat">
+        <span class="icon">🍖</span><span class="label">Mat</span>
+      </button>
+      <button class="actionBtn" id="btn-play" title="Lek">
+        <span class="icon">🎾</span><span class="label">Lek</span>
+      </button>
+      <button class="actionBtn" id="btn-wash" title="Vask">
+        <span class="icon">🧼</span><span class="label">Vask</span>
+      </button>
+      <button class="actionBtn" id="btn-sleep" title="Sov">
+        <span class="icon">💤</span><span class="label">Sov</span>
+      </button>
+      <button class="actionBtn" id="btn-sound" title="Lyd">
+        <span class="icon" id="soundIcon">🔊</span><span class="label">Lyd</span>
+      </button>
+    </nav>
+
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>
