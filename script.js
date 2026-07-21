@@ -11,7 +11,7 @@ const GROWTH_HOURS = { baby:0, child:2, teen:8, adult:24 }; // hours since hatch
 const STAGE_SCALE   = { baby:0.55, child:0.75, teen:0.9, adult:1.05 };
 
 const DECAY_PER_HOUR = { hunger:8, hygiene:5, happiness:6, energy:4 };
-const SLEEP_ENERGY_GAIN_PER_HOUR = 200;
+const SLEEP_ENERGY_GAIN_PER_HOUR = 400;
 const SLEEP_DECAY_FACTOR = 0.4;
 
 const SAVE_KEY = 'petgame_save_v1';
