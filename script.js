@@ -593,12 +593,12 @@ function drawPacifier(ctx, x, y, scale=1){
   ctx.beginPath();
   ctx.ellipse(0,15,5.5,4.2,0,0,Math.PI*2);
   ctx.lineWidth=3;
-  ctx.strokeStyle='#ff8fb1';
+  ctx.strokeStyle='#4fa8e8';
   ctx.stroke();
   // shield
   ctx.beginPath();
   ctx.ellipse(0,5,10.5,7.5,0,0,Math.PI*2);
-  ctx.fillStyle='#ff8fb1';
+  ctx.fillStyle='#4fa8e8';
   ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,0.18)';
   ctx.lineWidth=1;
@@ -1217,7 +1217,6 @@ function doFeed(){
 
 function doPlay(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
-  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
   if(state.stats.energy < 10) return toast('For sliten til å leke 😴');
 
@@ -1235,7 +1234,6 @@ function doPlay(){
 
 function doWash(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
-  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
 
   triggerAction('wash');
@@ -1249,7 +1247,6 @@ function doWash(){
 
 function doJump(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
-  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
   if(state.stats.energy < 8) return toast('For sliten til å hoppe 😴');
 
@@ -1265,7 +1262,6 @@ function doJump(){
 
 function doCycle(){
   if(state.sleeping) return toast('Zzz... sover nå 💤');
-  if(state.pacifier) return toast('Har smokk i munnen 🍼');
   if(currentAction) return;
   if(state.stats.energy < 15) return toast('For sliten til å sykle 😴');
 
@@ -1294,7 +1290,6 @@ function doBrushTeeth(){
 }
 
 function doTogglePacifier(){
-  if(state.sleeping) return toast('Zzz... sover nå 💤');
   state.pacifier = !state.pacifier;
   if(state.pacifier){ SFX.pacifierIn(); toast('God og rolig 🍼'); }
   else { SFX.pacifierOut(); toast('Smokk ut!'); }
@@ -1307,7 +1302,6 @@ function refreshPacifierUI(){
 }
 
 function doToggleSleep(){
-  if(state.pacifier) return toast('Ta ut smokken først 🍼');
   state.sleeping = !state.sleeping;
   if(state.sleeping){ SFX.sleep(); toast('God natt 🌙'); }
   else { SFX.wake(); toast('God morgen! ☀️'); }
