@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kjaeledyr-egg-v2';
+const CACHE_NAME = 'kjaeledyr-egg-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -26,12 +26,14 @@ self.addEventListener('activate', (event) => {
 });
 
 // Network-first: always try to fetch the latest version when online,
-// only fall back to the cached copy when offline. This ensures updates
-// pushed to GitHub actually reach installed devices.
+// only fall back to the cached copy when offline. `cache: 'no-store'`
+// bypasses the browser's own HTTP cache too, not just the SW cache -
+// otherwise GitHub Pages' cache-control headers can still serve a
+// stale response even though this handler "goes to the network".
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-store' })
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
