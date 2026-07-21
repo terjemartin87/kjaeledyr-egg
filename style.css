@@ -370,7 +370,8 @@ html,body{
   transition:background .15s ease, transform .1s ease;
 }
 .actionBtn:active{ transform:scale(.92); background:rgba(255,255,255,0.15); }
-.actionBtn .icon{ font-size:1.3rem; }
+.actionBtn .icon{ font-size:1.3rem; display:flex; align-items:center; justify-content:center; height:1.3em; }
+.actionBtn .icon svg{ display:block; }
 .actionBtn .label{ font-size:.6rem; opacity:.75; }
 .actionBtn.disabled{ opacity:.35; pointer-events:none; }
 .actionBtn.activeToggle{ background:rgba(255,143,177,0.28); border-color:rgba(255,143,177,0.5); }

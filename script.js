@@ -17,6 +17,16 @@ const GROWTH_UNITS = { baby:0, child:0.35, teen:1.4, adult:4 };
 const STAGE_SCALE  = { baby:0.42, child:0.68, teen:1.0, adult:1.4 };
 const GROWTH_ACTION_BONUS = 0.03;
 
+// Shape/proportion changes per stage, not just uniform size - a baby is a
+// round, big-eyed, feature-less blob; features and proportions come in
+// gradually so growing up actually looks different, not just "bigger".
+const STAGE_PROFILE = {
+  baby:  { bodyRX:1.0,  bodyRY:1.08, eyeScale:1.35, eyeSpread:0.85, earScale:0.6,  tailScale:0.5, features:false },
+  child: { bodyRX:1.0,  bodyRY:1.0,  eyeScale:1.15, eyeSpread:0.95, earScale:0.85, tailScale:0.8, features:true  },
+  teen:  { bodyRX:1.05, bodyRY:0.95, eyeScale:1.0,  eyeSpread:1.0,  earScale:1.0,  tailScale:1.0, features:true  },
+  adult: { bodyRX:1.18, bodyRY:0.88, eyeScale:0.85, eyeSpread:1.05, earScale:1.15, tailScale:1.15,features:true  },
+};
+
 const DECAY_PER_HOUR = { hunger:13, hygiene:10, happiness:6, energy:4 };
 const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
@@ -575,6 +585,36 @@ function getPlayTransform(key, p){
   }
 }
 
+function drawPacifier(ctx, x, y, scale=1){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  // ring handle
+  ctx.beginPath();
+  ctx.ellipse(0,15,5.5,4.2,0,0,Math.PI*2);
+  ctx.lineWidth=3;
+  ctx.strokeStyle='#ff8fb1';
+  ctx.stroke();
+  // shield
+  ctx.beginPath();
+  ctx.ellipse(0,5,10.5,7.5,0,0,Math.PI*2);
+  ctx.fillStyle='#ff8fb1';
+  ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.18)';
+  ctx.lineWidth=1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(-3,2,4,2.4,-0.3,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.4)';
+  ctx.fill();
+  // nipple (tucked toward the mouth)
+  ctx.beginPath();
+  ctx.ellipse(0,-4,3.6,5.2,0,0,Math.PI*2);
+  ctx.fillStyle='#f4d9b8';
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -587,6 +627,7 @@ function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
 
 function drawCreature(ctx, speciesKey, stage, opts={}){
   const sp = SPECIES[speciesKey];
+  const profile = STAGE_PROFILE[stage];
   const baseScale = STAGE_SCALE[stage] * 130;
   const sad = opts.sad;
   const asleep = opts.asleep;
@@ -637,7 +678,10 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   ctx.rotate(extraRotate);
   ctx.scale((baseScale/100)*extraScaleX*pulseScale*Math.cos(yaw), (baseScale/100)*extraScaleY*pulseScale);
 
+  ctx.save();
+  ctx.scale(profile.tailScale, profile.tailScale);
   drawTail(ctx, speciesKey, sp, stage);
+  ctx.restore();
 
   // bicycle (drawn behind/below the body)
   if(action && action.type==='cycle'){
@@ -663,21 +707,24 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   // body
   ctx.beginPath();
-  ctx.ellipse(0,10,58,50,0,0,Math.PI*2);
+  ctx.ellipse(0,10,58*profile.bodyRX,50*profile.bodyRY,0,0,Math.PI*2);
   ctx.fillStyle = sp.body;
   ctx.fill();
 
   // belly patch
   ctx.beginPath();
-  ctx.ellipse(0,26,30,24,0,0,Math.PI*2);
+  ctx.ellipse(0,26*profile.bodyRY,30*profile.bodyRX,24*profile.bodyRY,0,0,Math.PI*2);
   ctx.fillStyle='rgba(255,255,255,0.45)';
   ctx.fill();
 
-  // ears
+  // ears (baby has small stubby ears, adult has full-size ones)
+  ctx.save();
+  ctx.scale(profile.earScale, profile.earScale);
   drawEars(ctx, speciesKey, sp);
+  ctx.restore();
 
-  // dragon back spikes / wings
-  if(speciesKey==='dragon'){
+  // dragon back spikes / wings - unlock gradually as it grows up
+  if(speciesKey==='dragon' && profile.features){
     if(stage==='teen'||stage==='adult'){
       ctx.fillStyle = sp.pattern;
       for(let i=-1;i<=1;i++){
@@ -704,7 +751,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   // panda eye patches (drawn before eyes so eyes render on top)
-  if(speciesKey==='panda' && !closedEyes){
+  if(speciesKey==='panda' && !closedEyes && profile.features){
     ctx.fillStyle = sp.ear;
     [-1,1].forEach(dir=>{
       ctx.beginPath();
@@ -714,16 +761,17 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   // fox / dog muzzle (light patch + protruding snout)
-  if((speciesKey==='fox' || speciesKey==='dog') && !pacifier){
+  if((speciesKey==='fox' || speciesKey==='dog') && !pacifier && profile.features){
     ctx.beginPath();
     ctx.ellipse(0,16,17,13,0,0,Math.PI*2);
     ctx.fillStyle = speciesKey==='fox' ? '#fff8ee' : 'rgba(255,255,255,0.55)';
     ctx.fill();
   }
 
-  // face
+  // face - eyes are proportionally bigger on a baby, smaller as it matures
   const eyeY = -8;
-  const eyeDX = 20;
+  const eyeDX = 20*profile.eyeSpread;
+  const eyeR = 7*profile.eyeScale;
   const blink = (blinkPhase>0.92);
   const annoyed = sad || (action && action.type==='refuse');
   const faceShift = Math.sin(yaw)*6;
@@ -745,17 +793,17 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     [-1,1].forEach(dir=>{
       ctx.beginPath();
       if(sp.eyeType==='slit'){
-        ctx.ellipse(dir*eyeDX, eyeY, 7, 9, 0, 0, Math.PI*2);
+        ctx.ellipse(dir*eyeDX, eyeY, eyeR, eyeR*1.28, 0, 0, Math.PI*2);
         ctx.fillStyle='#fff';
         ctx.fill();
         ctx.fillStyle='#2a2a2a';
-        ctx.fillRect(dir*eyeDX-1.5, eyeY-6, 3, 12);
+        ctx.fillRect(dir*eyeDX-1.5, eyeY-eyeR*0.85, 3, eyeR*1.7);
       } else {
-        ctx.arc(dir*eyeDX, eyeY, 7, 0, Math.PI*2);
+        ctx.arc(dir*eyeDX, eyeY, eyeR, 0, Math.PI*2);
         ctx.fillStyle='#fff';
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(dir*eyeDX + (annoyed?0:1), eyeY+ (annoyed?2:1), 4, 0, Math.PI*2);
+        ctx.arc(dir*eyeDX + (annoyed?0:1), eyeY+ (annoyed?2:1), eyeR*0.57, 0, Math.PI*2);
         ctx.fillStyle='#2a2a2a';
         ctx.fill();
       }
@@ -763,7 +811,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   // whiskers (cat)
-  if(speciesKey==='cat' && !closedEyes){
+  if(speciesKey==='cat' && !closedEyes && profile.features){
     ctx.strokeStyle='rgba(60,40,30,0.45)';
     ctx.lineWidth=1.3;
     [-1,1].forEach(dir=>{
@@ -789,7 +837,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   if(pacifier){
-    drawEmojiOverlay(ctx, '🍼', 0, 14, 30, 1);
+    drawPacifier(ctx, 0, 12, 1.1);
   } else {
     // nose + mouth
     ctx.fillStyle='#3a2a20';
@@ -817,7 +865,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.stroke();
 
     // bunny teeth
-    if(speciesKey==='bunny' && !annoyed && !asleep){
+    if(speciesKey==='bunny' && !annoyed && !asleep && profile.features){
       ctx.fillStyle='#fff';
       ctx.fillRect(-4,15,3.5,6);
       ctx.fillRect(0.5,15,3.5,6);
