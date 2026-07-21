@@ -745,10 +745,6 @@ function applyElapsed(){
     s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours*SLEEP_DECAY_FACTOR);
     s.hygiene = clamp(s.hygiene - DECAY_PER_HOUR.hygiene*hours*SLEEP_DECAY_FACTOR);
     s.happiness = clamp(s.happiness - DECAY_PER_HOUR.happiness*hours*SLEEP_DECAY_FACTOR);
-    if(s.energy >= 100){
-      state.sleeping = false;
-      toast('Uthvilt og klar! ☀️');
-    }
   } else {
     s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours);
     s.energy = clamp(s.energy - DECAY_PER_HOUR.energy*hours);
