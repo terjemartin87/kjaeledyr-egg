@@ -25,20 +25,16 @@ const SHOP_ITEMS = [
 
 const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
 
-// Growth is driven by a care-weighted "growth progress" accumulator, not raw
-// wall-clock age - a well-loved pet grows noticeably faster than a neglected one.
 const GROWTH_UNITS = { baby:0, child:1.0, teen:3.5, adult:10 };
 const STAGE_SCALE  = { baby:0.42, child:0.68, teen:1.0, adult:1.4 };
 const GROWTH_ACTION_BONUS = 0.015;
 
-// Shape/proportion changes per stage, not just uniform size - a baby is a
-// round, big-eyed, feature-less blob; features and proportions come in
-// gradually so growing up actually looks different, not just "bigger".
+// Ekte proporsjoner: skiller hode og kropp. Baby har stort hode og liten kropp. Voksen har lang kropp og lengre snute.
 const STAGE_PROFILE = {
-  baby:  { bodyRX:1.0,  bodyRY:1.08, eyeScale:1.35, eyeSpread:0.85, earScale:0.6,  tailScale:0.5, features:false },
-  child: { bodyRX:1.0,  bodyRY:1.0,  eyeScale:1.15, eyeSpread:0.95, earScale:0.85, tailScale:0.8, features:true  },
-  teen:  { bodyRX:1.05, bodyRY:0.95, eyeScale:1.0,  eyeSpread:1.0,  earScale:1.0,  tailScale:1.0, features:true  },
-  adult: { bodyRX:1.18, bodyRY:0.88, eyeScale:0.85, eyeSpread:1.05, earScale:1.15, tailScale:1.15,features:true  },
+  baby:  { headR: 38, bodyRX: 24, bodyRY: 20, bodyY: 28, eyeScale: 1.35, eyeSpread: 0.85, earScale: 0.6,  tailScale: 0.5, features: true },
+  child: { headR: 34, bodyRX: 32, bodyRY: 30, bodyY: 38, eyeScale: 1.15, eyeSpread: 0.95, earScale: 0.85, tailScale: 0.8, features: true },
+  teen:  { headR: 30, bodyRX: 38, bodyRY: 42, bodyY: 48, eyeScale: 1.0,  eyeSpread: 1.0,  earScale: 1.0,  tailScale: 1.0, features: true },
+  adult: { headR: 26, bodyRX: 44, bodyRY: 56, bodyY: 58, eyeScale: 0.85, eyeSpread: 1.05, earScale: 1.15, tailScale: 1.15, features: true },
 };
 
 const DECAY_PER_HOUR = { hunger:20, hygiene:10, happiness:6, energy:4 };
@@ -81,7 +77,7 @@ let animFrame = 0;
 let eggShakeCount = 0;
 let eggWobble = 0;
 let selectedSpecies = null;
-let currentAction = null; // { type, variant, start, duration }
+let currentAction = null;
 let growthPulseUntil = 0;
 let petYaw = 0;
 let petYawTarget = 0;
@@ -155,7 +151,7 @@ const el = {
 
 function defaultState(){
   return {
-    phase:'select',       // select | egg | pet
+    phase:'select',
     species:null,
     petName:null,
     hatched:false,
@@ -790,8 +786,6 @@ function drawPacifier(ctx, x, y, scale=1){
   ctx.restore();
 }
 
-// originX/originY = "eye level" anchor point; spread = half-distance between
-// eyes (for glasses); scale lets the same shapes fit tiny reptile heads too.
 function drawAccessory(ctx, id, originX, originY, spread, scale=1){
   ctx.save();
   ctx.translate(originX, originY);
@@ -916,12 +910,40 @@ function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
   ctx.restore();
 }
 
+function drawLimbs(ctx, speciesKey, sp, profile, bodyY) {
+  const isPanda = speciesKey === 'panda';
+  const limbColor = isPanda ? '#2a2a2a' : sp.body;
+  const pawColor = isPanda ? '#1a1a1a' : 'rgba(255,255,255,0.4)';
+
+  // Bakbein
+  [-1, 1].forEach(dir => {
+    ctx.beginPath();
+    ctx.ellipse(dir * profile.bodyRX * 0.7, bodyY + profile.bodyRY * 0.7, 12, 16, dir * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = limbColor;
+    ctx.fill();
+    // Poter
+    ctx.beginPath();
+    ctx.ellipse(dir * profile.bodyRX * 0.75, bodyY + profile.bodyRY * 0.7 + 12, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = pawColor;
+    ctx.fill();
+  });
+
+  // Armer foran
+  [-1, 1].forEach(dir => {
+    ctx.beginPath();
+    ctx.ellipse(dir * profile.bodyRX * 0.8, bodyY - profile.bodyRY * 0.1, 10, 20, dir * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = limbColor;
+    ctx.fill();
+  });
+}
+
 function drawCreature(ctx, speciesKey, stage, opts={}){
   const sp = SPECIES[speciesKey];
   if(sp.bodyPlan==='snake') return drawSnakeCreature(ctx, speciesKey, stage, opts);
   if(sp.bodyPlan==='gecko') return drawGeckoCreature(ctx, speciesKey, stage, opts);
+  
   const profile = STAGE_PROFILE[stage];
-  const baseScale = STAGE_SCALE[stage] * 130;
+  const baseScale = STAGE_SCALE[stage] * 120;
   const sad = opts.sad;
   const asleep = opts.asleep;
   const pacifier = opts.pacifier;
@@ -970,104 +992,102 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   const closedEyes = asleep || (action && action.type==='wash');
 
   ctx.save();
-  ctx.translate(180+extraTX, 200+bounce+extraTY);
+  ctx.translate(180+extraTX, 180 - (profile.bodyY/2) + bounce+extraTY);
   ctx.rotate(extraRotate);
   ctx.scale((baseScale/100)*extraScaleX*pulseScale*Math.cos(yaw), (baseScale/100)*extraScaleY*pulseScale);
 
+  // 1. Hale
   ctx.save();
+  ctx.translate(0, profile.bodyY);
   ctx.scale(profile.tailScale, profile.tailScale);
   drawTail(ctx, speciesKey, sp, stage);
   ctx.restore();
 
-  // bicycle (drawn behind/below the body)
+  // Sykkel (tegnes bak)
   if(action && action.type==='cycle'){
     const wheelRot = action.progress*Math.PI*10;
-    ctx.strokeStyle = '#c0392b';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(-30,60); ctx.lineTo(0,32); ctx.lineTo(30,60);
-    ctx.stroke();
+    ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-30, profile.bodyY+60); ctx.lineTo(0, profile.bodyY+32); ctx.lineTo(30, profile.bodyY+60); ctx.stroke();
     [-30,30].forEach(wx=>{
-      ctx.save();
-      ctx.translate(wx, 62);
-      ctx.rotate(wheelRot);
-      ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2);
-      ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=3; ctx.stroke();
-      for(let s=0;s<4;s++){
-        ctx.beginPath(); ctx.moveTo(-15,0); ctx.lineTo(15,0); ctx.stroke();
-        ctx.rotate(Math.PI/4);
-      }
+      ctx.save(); ctx.translate(wx, profile.bodyY+62); ctx.rotate(wheelRot);
+      ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2); ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=3; ctx.stroke();
+      for(let s=0;s<4;s++){ ctx.beginPath(); ctx.moveTo(-15,0); ctx.lineTo(15,0); ctx.stroke(); ctx.rotate(Math.PI/4); }
       ctx.restore();
     });
   }
 
-  // body
+  // Dragevinger (bak kropp)
+  if(speciesKey==='dragon' && profile.features){
+    ctx.save(); ctx.translate(0, profile.bodyY);
+    [-1,1].forEach(dir=>{
+      ctx.beginPath(); ctx.moveTo(dir*20, -10); ctx.quadraticCurveTo(dir*90,-40,dir*70,20); ctx.quadraticCurveTo(dir*55,10,dir*20,-10); ctx.closePath();
+      ctx.fillStyle='rgba(127,216,160,0.55)'; ctx.fill(); ctx.strokeStyle='rgba(79,174,116,0.6)'; ctx.lineWidth=1.5; ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // 2. Armer og bein
+  drawLimbs(ctx, speciesKey, sp, profile, profile.bodyY);
+
+  // 3. Kropp (Torso)
   ctx.beginPath();
-  ctx.ellipse(0,10,58*profile.bodyRX,50*profile.bodyRY,0,0,Math.PI*2);
-  ctx.fillStyle = sp.body;
+  ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2);
+  ctx.fillStyle = (speciesKey === 'panda') ? '#2a2a2a' : sp.body; 
   ctx.fill();
 
-  // belly patch
-  ctx.beginPath();
-  ctx.ellipse(0,26*profile.bodyRY,30*profile.bodyRX,24*profile.bodyRY,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.45)';
-  ctx.fill();
+  // Mage
+  if(speciesKey === 'panda') {
+    ctx.beginPath();
+    ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.75, 0, 0, Math.PI*2);
+    ctx.fillStyle = sp.body; 
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.fill();
+  }
 
-  // ears (baby has small stubby ears, adult has full-size ones)
+  // Halsbånd/skjerf
+  const equipped = opts.equipped;
+  if(equipped && equipped.neck){
+    drawNeckAccessory(ctx, equipped.neck, 0, profile.bodyY - profile.bodyRY*0.6);
+  }
+
+  // 4. Ører (bak hodet)
   ctx.save();
   ctx.scale(profile.earScale, profile.earScale);
   drawEars(ctx, speciesKey, sp);
   ctx.restore();
 
-  // dragon back spikes / wings - unlock gradually as it grows up
-  if(speciesKey==='dragon' && profile.features){
-    if(stage==='teen'||stage==='adult'){
-      ctx.fillStyle = sp.pattern;
-      for(let i=-1;i<=1;i++){
-        ctx.beginPath();
-        ctx.moveTo(i*16-6,-40);
-        ctx.lineTo(i*16,-56);
-        ctx.lineTo(i*16+6,-40);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-    [-1,1].forEach(dir=>{
-      ctx.beginPath();
-      ctx.moveTo(dir*40,0);
-      ctx.quadraticCurveTo(dir*90,-10,dir*70,20);
-      ctx.quadraticCurveTo(dir*55,10,dir*40,0);
-      ctx.closePath();
-      ctx.fillStyle='rgba(127,216,160,0.55)';
-      ctx.fill();
-      ctx.strokeStyle='rgba(79,174,116,0.6)';
-      ctx.lineWidth=1.5;
-      ctx.stroke();
-    });
-  }
+  // 5. Hode
+  ctx.beginPath();
+  ctx.arc(0, 0, profile.headR, 0, Math.PI*2);
+  ctx.fillStyle = sp.body;
+  ctx.fill();
 
-  // panda eye patches (drawn before eyes so eyes render on top)
+  // Panda øyelapper
   if(speciesKey==='panda' && !closedEyes && profile.features){
     ctx.fillStyle = sp.ear;
     [-1,1].forEach(dir=>{
-      ctx.beginPath();
-      ctx.ellipse(dir*20,-8,11,13,dir*0.15,0,Math.PI*2);
-      ctx.fill();
+      ctx.beginPath(); ctx.ellipse(dir*16,-2,10,12,dir*0.15,0,Math.PI*2); ctx.fill();
     });
   }
 
-  // fox / dog muzzle (light patch + protruding snout)
+  // Hunde/reve snute
   if((speciesKey==='fox' || speciesKey==='dog') && !pacifier && profile.features){
     ctx.beginPath();
-    ctx.ellipse(0,16,17,13,0,0,Math.PI*2);
-    ctx.fillStyle = speciesKey==='fox' ? '#fff8ee' : 'rgba(255,255,255,0.55)';
+    const snoutW = stage === 'adult' ? 18 : (stage === 'teen' ? 16 : 14);
+    const snoutH = stage === 'adult' ? 14 : 12;
+    ctx.ellipse(0, 10, snoutW, snoutH, 0, 0, Math.PI*2);
+    ctx.fillStyle = speciesKey==='fox' ? '#fff8ee' : 'rgba(255,255,255,0.6)';
     ctx.fill();
   }
 
-  // face - eyes are proportionally bigger on a baby, smaller as it matures
-  const eyeY = -8;
-  const eyeDX = 20*profile.eyeSpread;
-  const eyeR = 7*profile.eyeScale;
+  // Ansikt
+  const eyeY = -4;
+  const eyeDX = 16 * profile.eyeSpread;
+  const eyeR = 6 * profile.eyeScale;
   const blink = (blinkPhase>0.92);
   const annoyed = sad || (action && action.type==='refuse');
   const faceShift = Math.sin(yaw)*6;
@@ -1075,161 +1095,76 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   ctx.save();
   ctx.translate(faceShift, 0);
 
+  // Øyne
   if(closedEyes || blink){
-    ctx.strokeStyle='#3a2a20';
-    ctx.lineWidth=3;
-    ctx.lineCap='round';
+    ctx.strokeStyle='#3a2a20'; ctx.lineWidth=3; ctx.lineCap='round';
     [-1,1].forEach(dir=>{
-      ctx.beginPath();
-      ctx.moveTo(dir*eyeDX-8, eyeY);
-      ctx.quadraticCurveTo(dir*eyeDX, eyeY+6, dir*eyeDX+8, eyeY);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(dir*eyeDX-8, eyeY); ctx.quadraticCurveTo(dir*eyeDX, eyeY+6, dir*eyeDX+8, eyeY); ctx.stroke();
     });
   } else {
     [-1,1].forEach(dir=>{
       ctx.beginPath();
       if(sp.eyeType==='slit'){
-        ctx.ellipse(dir*eyeDX, eyeY, eyeR, eyeR*1.28, 0, 0, Math.PI*2);
-        ctx.fillStyle='#fff';
-        ctx.fill();
-        ctx.fillStyle='#2a2a2a';
-        ctx.fillRect(dir*eyeDX-1.5, eyeY-eyeR*0.85, 3, eyeR*1.7);
+        ctx.ellipse(dir*eyeDX, eyeY, eyeR, eyeR*1.28, 0, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+        ctx.fillStyle='#2a2a2a'; ctx.fillRect(dir*eyeDX-1.5, eyeY-eyeR*0.85, 3, eyeR*1.7);
       } else {
-        ctx.arc(dir*eyeDX, eyeY, eyeR, 0, Math.PI*2);
-        ctx.fillStyle='#fff';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(dir*eyeDX + (annoyed?0:1), eyeY+ (annoyed?2:1), eyeR*0.57, 0, Math.PI*2);
-        ctx.fillStyle='#2a2a2a';
-        ctx.fill();
+        ctx.arc(dir*eyeDX, eyeY, eyeR, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+        ctx.beginPath(); ctx.arc(dir*eyeDX + (annoyed?0:1), eyeY+ (annoyed?2:1), eyeR*0.57, 0, Math.PI*2); ctx.fillStyle='#2a2a2a'; ctx.fill();
       }
     });
   }
 
-  // equipped glasses (drawn over the eyes)
-  const equipped = opts.equipped;
-  if(equipped && equipped.glasses && !closedEyes){
-    drawAccessory(ctx, equipped.glasses, 0, eyeY, eyeDX, 1);
-  }
+  if(equipped && equipped.glasses && !closedEyes) drawAccessory(ctx, equipped.glasses, 0, eyeY, eyeDX, 1);
 
-  // whiskers (cat)
   if(speciesKey==='cat' && !closedEyes && profile.features){
-    ctx.strokeStyle='rgba(60,40,30,0.45)';
-    ctx.lineWidth=1.3;
+    ctx.strokeStyle='rgba(60,40,30,0.45)'; ctx.lineWidth=1.3;
     [-1,1].forEach(dir=>{
-      for(let i=-1;i<=1;i++){
-        ctx.beginPath();
-        ctx.moveTo(dir*30, 14+i*4);
-        ctx.lineTo(dir*48, 10+i*6);
-        ctx.stroke();
-      }
+      for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(dir*22, 8+i*4); ctx.lineTo(dir*38, 6+i*6); ctx.stroke(); }
     });
   }
 
-  // eyebrows if sad or refusing
   if(annoyed && !closedEyes){
-    ctx.strokeStyle='rgba(0,0,0,0.4)';
-    ctx.lineWidth=3;
-    [-1,1].forEach(dir=>{
-      ctx.beginPath();
-      ctx.moveTo(dir*eyeDX-9, eyeY-11);
-      ctx.lineTo(dir*eyeDX+9, eyeY-6);
-      ctx.stroke();
-    });
+    ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=3;
+    [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-9, eyeY-11); ctx.lineTo(dir*eyeDX+9, eyeY-6); ctx.stroke(); });
   }
 
   if(pacifier){
-    drawPacifier(ctx, 0, 12, 1.1);
+    drawPacifier(ctx, 0, 10, 1.1);
   } else {
-    // nose + mouth
-    ctx.fillStyle='#3a2a20';
-    ctx.beginPath();
-    ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    ctx.strokeStyle='#3a2a20';
-    ctx.lineWidth=2.5;
-    ctx.lineCap='round';
-    ctx.beginPath();
-    if(asleep){
-      ctx.moveTo(-6,14); ctx.lineTo(6,14);
-    } else if(action && action.type==='eat' && chompProgress<1){
-      const mouthOpen = Math.abs(Math.sin(chompProgress*Math.PI*4))*8;
-      ctx.moveTo(-9,12);
-      ctx.quadraticCurveTo(0,16+mouthOpen,9,12);
-    } else if(annoyed){
-      ctx.moveTo(-9,18);
-      ctx.quadraticCurveTo(0,10,9,18);
-    } else {
-      ctx.moveTo(-9,12);
-      ctx.quadraticCurveTo(0,22,9,12);
-    }
+    ctx.fillStyle='#3a2a20'; ctx.beginPath(); ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#3a2a20'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
+    if(asleep){ ctx.moveTo(-6,12); ctx.lineTo(6,12); }
+    else if(action && action.type==='eat' && chompProgress<1){ const mouthOpen = Math.abs(Math.sin(chompProgress*Math.PI*4))*8; ctx.moveTo(-9,10); ctx.quadraticCurveTo(0,14+mouthOpen,9,10); }
+    else if(annoyed){ ctx.moveTo(-9,16); ctx.quadraticCurveTo(0,8,9,16); }
+    else { ctx.moveTo(-9,10); ctx.quadraticCurveTo(0,20,9,10); }
     ctx.stroke();
 
-    // bunny teeth
     if(speciesKey==='bunny' && !annoyed && !asleep && profile.features){
-      ctx.fillStyle='#fff';
-      ctx.fillRect(-4,15,3.5,6);
-      ctx.fillRect(0.5,15,3.5,6);
-      ctx.strokeStyle='rgba(0,0,0,0.15)';
-      ctx.lineWidth=0.5;
-      ctx.strokeRect(-4,15,3.5,6);
-      ctx.strokeRect(0.5,15,3.5,6);
+      ctx.fillStyle='#fff'; ctx.fillRect(-4,13,3.5,6); ctx.fillRect(0.5,13,3.5,6);
+      ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=0.5; ctx.strokeRect(-4,13,3.5,6); ctx.strokeRect(0.5,13,3.5,6);
     }
   }
 
-  // cheeks
   ctx.fillStyle='rgba(255,120,140,0.35)';
-  [-1,1].forEach(dir=>{
-    ctx.beginPath();
-    ctx.arc(dir*32, 12, 7, 0, Math.PI*2);
-    ctx.fill();
-  });
+  [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*24, 10, 6, 0, Math.PI*2); ctx.fill(); });
 
-  // equipped hat (drawn last so it sits on top of everything, including ears)
-  if(equipped && equipped.hat){
-    drawAccessory(ctx, equipped.hat, 0, eyeY, eyeDX, 1);
-  }
+  if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, 0, -profile.headR + 10, eyeDX, 1);
 
-  // action overlays (food, soap, toothbrush)
   if(action && action.type==='eat'){
-    const foodEmoji = FOOD_EMOJI[speciesKey] || '🍎';
-    if(chompProgress<1){
-      const foodScale = 1-chompProgress*0.7;
-      drawEmojiOverlay(ctx, foodEmoji, 34, 4, 30*foodScale, 1);
-    }
+    if(chompProgress<1){ const foodScale = 1-chompProgress*0.7; drawEmojiOverlay(ctx, FOOD_EMOJI[speciesKey] || '🍎', 30, 4, 30*foodScale, 1); }
   } else if(action && action.type==='refuse'){
-    const foodEmoji = FOOD_EMOJI[speciesKey] || '🍎';
-    const pushAway = action.progress*18;
-    drawEmojiOverlay(ctx, foodEmoji, 40+pushAway, 4, 26, 1-action.progress*0.7);
+    drawEmojiOverlay(ctx, FOOD_EMOJI[speciesKey] || '🍎', 34+action.progress*18, 4, 26, 1-action.progress*0.7);
   } else if(action && action.type==='wash'){
-    const p = action.progress;
-    const sudsEnv = Math.sin(Math.min(p/0.85,1)*Math.PI);
-    ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    const suds = [[-22,-4,10],[10,-14,12],[24,8,9],[-8,18,8],[2,-2,14]];
-    suds.forEach(([sx,sy,sr],i)=>{
-      ctx.beginPath();
-      ctx.arc(sx, sy, sr*sudsEnv*(0.7+0.3*Math.sin(p*10+i)), 0, Math.PI*2);
-      ctx.fill();
-    });
-    const spongeX = Math.sin(p*Math.PI*6)*36;
-    drawEmojiOverlay(ctx, '🧽', spongeX, 4, 26, 1);
+    const p = action.progress; const sudsEnv = Math.sin(Math.min(p/0.85,1)*Math.PI); ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    [[-18,-4,10],[10,-12,12],[20,8,9],[-6,16,8],[2,-2,14]].forEach(([sx,sy,sr],i)=>{ ctx.beginPath(); ctx.arc(sx, sy, sr*sudsEnv*(0.7+0.3*Math.sin(p*10+i)), 0, Math.PI*2); ctx.fill(); });
+    drawEmojiOverlay(ctx, '🧽', Math.sin(p*Math.PI*6)*30, 4, 26, 1);
   } else if(action && action.type==='brush'){
-    const bx = Math.sin(action.progress*Math.PI*12)*8;
-    drawEmojiOverlay(ctx, '🪥', 4+bx, 8, 26, 1);
-    if(action.progress>0.8){
-      drawEmojiOverlay(ctx, '✨', 22, -18, 18, 1);
-    }
+    drawEmojiOverlay(ctx, '🪥', 4+Math.sin(action.progress*Math.PI*12)*8, 8, 26, 1);
+    if(action.progress>0.8) drawEmojiOverlay(ctx, '✨', 20, -14, 18, 1);
   }
 
-  ctx.restore(); // face shift
-
-  // equipped neck accessory (bowtie/scarf/bandana) sits on the body, not the face
-  if(equipped && equipped.neck){
-    drawNeckAccessory(ctx, equipped.neck);
-  }
-
-  ctx.restore(); // main transform
+  ctx.restore();
+  ctx.restore();
 }
 
 function drawTail(ctx, speciesKey, sp, stage){
@@ -1427,7 +1362,7 @@ function computeSharedTransform(opts){
 function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR){
   const action = opts.action;
   const equipped = opts.equipped;
-  const hs = headR/22; // scale factor so mammal-sized accessory art fits the small reptile head
+  const hs = headR/22; 
   if(action && action.type==='eat'){
     const foodEmoji = FOOD_EMOJI[speciesKey] || '🍎';
     if(t.chompProgress<1){
@@ -1490,7 +1425,6 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   ];
   drawTaperedPath(ctx, bodyPts, sp.body);
 
-  // diamond scale pattern along the spine
   ctx.fillStyle = sp.pattern;
   for(let i=0;i<bodyPts.length-1;i++){
     const a=bodyPts[i], b=bodyPts[i+1];
@@ -1571,14 +1505,12 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   ctx.rotate(t.extraRotate);
   ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
 
-  // tapered tail extending to the back
   drawTaperedPath(ctx, [
     { x:-40, y:6, r:5 },
     { x:-68, y:-2, r:9 },
     { x:-92, y:4, r:6 },
   ], sp.body);
 
-  // 4 stubby legs
   [[-28,26,-1],[18,26,-1],[-28,-24,1],[18,-24,1]].forEach(([lx,ly])=>{
     ctx.beginPath();
     ctx.ellipse(lx, ly, 10, 7, 0, 0, Math.PI*2);
@@ -1599,7 +1531,6 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   ctx.fillStyle = sp.body;
   ctx.fill();
 
-  // leopard spots on body + tail
   ctx.fillStyle = sp.pattern;
   [[-38,-6],[-20,10],[0,-10],[18,8],[-60,-1],[-78,3],[8,-2],[-30,3]].forEach(([sx,sy])=>{
     ctx.beginPath();
@@ -1632,7 +1563,6 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
     ctx.beginPath(); ctx.moveTo(headX+eyeDX2-7,eyeY2); ctx.quadraticCurveTo(headX+eyeDX2,eyeY2+5,headX+eyeDX2+7,eyeY2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(headX-eyeDX2-7,eyeY2); ctx.quadraticCurveTo(headX-eyeDX2,eyeY2+5,headX-eyeDX2+7,eyeY2); ctx.stroke();
   } else {
-    // big lidless gecko eyes with a vertical pupil
     [-1,1].forEach(dir=>{
       ctx.beginPath();
       ctx.arc(headX+dir*eyeDX2, eyeY2, headR*0.4, 0, Math.PI*2);
@@ -2158,7 +2088,7 @@ async function requestWakeLock(){
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
   }catch(e){
-    // ignored: e.g. blocked by low battery mode - not critical
+    // ignored
   }
 }
 
