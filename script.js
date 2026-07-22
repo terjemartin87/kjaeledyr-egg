@@ -655,10 +655,14 @@ function getPlayTransform(key, p){
 
 function drawPacifier(ctx, x, y, scale=1){
   ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
-  ctx.beginPath(); ctx.ellipse(0,15,5.5,4.2,0,0,Math.PI*2); ctx.lineWidth=3; ctx.strokeStyle='#4fa8e8'; ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(0,5,10.5,7.5,0,0,Math.PI*2); ctx.fillStyle='#4fa8e8'; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1; ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(-3,2,4,2.4,-0.3,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0,-4,3.6,5.2,0,0,Math.PI*2); ctx.fillStyle='#f4d9b8'; ctx.fill();
+  // Ringen henger nedover fra bunnen av skjoldet
+  ctx.beginPath(); ctx.ellipse(0, 9, 5.5, 5.5, 0, 0, Math.PI*2); ctx.lineWidth=3; ctx.strokeStyle='#4fa8e8'; ctx.stroke();
+  // Skjoldet sentrert rundt munn-koordinatet
+  ctx.beginPath(); ctx.ellipse(0, 0, 10.5, 7.5, 0, 0, Math.PI*2); ctx.fillStyle='#4fa8e8'; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1; ctx.stroke();
+  // Gjenskinn
+  ctx.beginPath(); ctx.ellipse(-3, -2, 4, 2.4, -0.3, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fill();
+  // "Tutten" / knappen på utsiden er nå en sentrert, fin knapp
+  ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 4.5, 0, 0, Math.PI*2); ctx.fillStyle='#f4d9b8'; ctx.fill();
   ctx.restore();
 }
 
@@ -967,7 +971,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   if(pacifier){
-    drawPacifier(ctx, 0, 19, 1.1); // nipple aligned with the mouth, not the nose
+    drawPacifier(ctx, 0, 13, 1.1); // Sentrert over munnen
   } else {
     ctx.fillStyle='#3a2a20'; ctx.beginPath(); ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle='#3a2a20'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
@@ -1056,7 +1060,7 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR
     const bx = Math.sin(action.progress*Math.PI*12)*6;
     drawEmojiOverlay(ctx, '🪥', mouthX+bx, mouthY, 22, 1);
   }
-  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY + 4*hs*0.8, hs*0.8);
+  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY, hs*0.8); // Sentrert på reptilmunnen
   if(equipped && equipped.glasses) drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
   if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.55, headR*0.42, hs*0.55);
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-headR*1.6, headY+headR*0.3, hs*0.6);
