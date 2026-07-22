@@ -13,9 +13,9 @@ const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Vokse
 
 // Growth is driven by a care-weighted "growth progress" accumulator, not raw
 // wall-clock age - a well-loved pet grows noticeably faster than a neglected one.
-const GROWTH_UNITS = { baby:0, child:0.35, teen:1.4, adult:4 };
+const GROWTH_UNITS = { baby:0, child:1.0, teen:3.5, adult:10 };
 const STAGE_SCALE  = { baby:0.42, child:0.68, teen:1.0, adult:1.4 };
-const GROWTH_ACTION_BONUS = 0.03;
+const GROWTH_ACTION_BONUS = 0.015;
 
 // Shape/proportion changes per stage, not just uniform size - a baby is a
 // round, big-eyed, feature-less blob; features and proportions come in
@@ -1143,8 +1143,8 @@ function clamp(v){ return Math.max(0, Math.min(100, v)); }
 function updateGrowth(hours){
   if(hours <= 0) return;
   let mult = 1;
-  if(state.stats.happiness >= 90) mult = 2.2;
-  else if(state.stats.happiness >= 70) mult = 1.5;
+  if(state.stats.happiness >= 90) mult = 1.4;
+  else if(state.stats.happiness >= 70) mult = 1.15;
   state.growthProgress = (state.growthProgress||0) + hours*mult;
 }
 
