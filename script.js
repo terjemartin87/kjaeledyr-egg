@@ -46,7 +46,7 @@ const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
 const PACIFIER_HAPPINESS_PER_HOUR = 40;
 
-const SLOT_KEYS = ['petgame_save_slot1', 'petgame_save_slot2', 'petgame_save_slot3'];
+const SLOT_KEYS = ['petgame_save_slot1', 'petgame_save_slot2', 'petgame_save_slot3', 'petgame_save_slot4'];
 const ACTIVE_SLOT_KEY = 'petgame_active_slot';
 const LEGACY_SAVE_KEY = 'petgame_save_v1';
 
