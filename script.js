@@ -954,6 +954,9 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   } else if(action && action.type==='cycle'){
     extraRotate = 0.08 + Math.sin(action.progress*Math.PI*10)*0.05;
     extraTY = Math.abs(Math.sin(action.progress*Math.PI*10))*4;
+  } else if(action && action.type==='drive'){
+    extraScaleX = 0.42; extraScaleY = 0.45;
+    extraTY = 40 + Math.sin(action.progress*Math.PI*12)*2;
   }
 
   let pulseScale = 1;
@@ -1408,6 +1411,9 @@ function computeSharedTransform(opts){
   } else if(action && action.type==='cycle'){
     extraRotate = 0.08 + Math.sin(action.progress*Math.PI*10)*0.05;
     extraTY = Math.abs(Math.sin(action.progress*Math.PI*10))*4;
+  } else if(action && action.type==='drive'){
+    extraScaleX = 0.5; extraScaleY = 0.5;
+    extraTY = 34 + Math.sin(action.progress*Math.PI*12)*2;
   }
   let pulseScale = 1;
   const pulseRemaining = growthPulseUntil - performance.now();
