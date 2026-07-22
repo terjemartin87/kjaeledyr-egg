@@ -19,8 +19,9 @@
 
     <!-- TOPBAR -->
     <header id="topbar">
-      <div id="petName">Kjæledyr-egg</div>
+      <div id="petName" title="Trykk for å gi nytt navn">Kjæledyr-egg</div>
       <div id="ageLabel"></div>
+      <button id="btn-coins" title="Butikk">🪙 <span id="coinCount">0</span></button>
       <button id="btn-restart" title="Bytt / slett lagring">⋮</button>
     </header>
 
@@ -56,7 +57,24 @@
         <h1>Lagringsplasser</h1>
         <p class="subtitle">Velg en plass å spille på</p>
         <div id="slotGrid"></div>
+        <button id="btn-meetup" class="bigButton hidden">La kjæledyrene møtes! 🎉</button>
         <button id="btn-closeSlots" class="bigButton ghostButton hidden">Avbryt</button>
+      </section>
+
+      <!-- SHOP SCREEN -->
+      <section id="screen-shop" class="screen hidden">
+        <h1>Butikk</h1>
+        <p class="subtitle"><span id="shopCoins">🪙 0</span> mynter</p>
+        <div id="shopGrid"></div>
+        <button id="btn-closeShop" class="bigButton ghostButton">Lukk</button>
+      </section>
+
+      <!-- MEETUP SCREEN -->
+      <section id="screen-meetup" class="screen hidden">
+        <h1>Lekestund!</h1>
+        <p class="subtitle" id="meetupSubtitle"></p>
+        <canvas id="canvas-meetup" width="360" height="260"></canvas>
+        <button id="btn-closeMeetup" class="bigButton">Ferdig</button>
       </section>
 
       <!-- SELECT SCREEN -->
@@ -76,6 +94,16 @@
       <!-- PET SCREEN -->
       <section id="screen-pet" class="screen hidden">
         <div id="petViewport">
+          <div id="roomBg">
+            <div id="roomWall"></div>
+            <div id="roomWindow">
+              <div id="skySunMoon"></div>
+              <div id="skyClouds"></div>
+              <div id="skyRain"></div>
+            </div>
+            <div id="roomRug"></div>
+            <div id="roomFloor"></div>
+          </div>
           <canvas id="canvas-pet" width="360" height="360"></canvas>
           <div id="sleepOverlay" class="hidden"></div>
           <div id="bubbleLayer"></div>
