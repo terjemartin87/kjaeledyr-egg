@@ -153,12 +153,19 @@ html,body{
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
   padding:20px;
   text-align:center;
   transition:opacity .35s ease;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 .screen.hidden{ display:none; }
+/* Center content vertically when it fits, but degrade to normal
+   top-aligned scrolling on short/older phone screens instead of
+   clipping - "margin:auto" on the end children is more broadly
+   supported than justify-content:safe center. */
+.screen > *:first-child{ margin-top:auto; }
+.screen > *:last-child{ margin-bottom:auto; }
 
 #screen-select h1{ margin:0 0 4px; font-size:1.3rem; }
 .subtitle{ margin:0 0 18px; opacity:.65; font-size:.9rem; }
