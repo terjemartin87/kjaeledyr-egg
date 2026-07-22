@@ -12,15 +12,26 @@ const SPECIES = {
 };
 
 const SHOP_ITEMS = [
+  // --- ting på dyret ---
   { id:'cap',         slot:'hat',      name:'Caps',          emoji:'🧢', price:30  },
   { id:'partyhat',    slot:'hat',      name:'Festhatt',      emoji:'🎉', price:25  },
   { id:'tophat',      slot:'hat',      name:'Flosshatt',     emoji:'🎩', price:60  },
   { id:'crown',       slot:'hat',      name:'Krone',         emoji:'👑', price:100 },
+  { id:'wizardhat',   slot:'hat',      name:'Trollmannhatt', emoji:'🧙', price:70  },
+  { id:'flowercrown', slot:'hat',      name:'Blomsterkrans', emoji:'🌸', price:45  },
   { id:'sunglasses',  slot:'glasses',  name:'Solbriller',    emoji:'🕶️', price:40  },
   { id:'nerdglasses', slot:'glasses',  name:'Nerdebriller',  emoji:'🤓', price:35  },
+  { id:'heartglasses',slot:'glasses',  name:'Hjertebriller', emoji:'😍', price:45  },
   { id:'bowtie',      slot:'neck',     name:'Sløyfe',        emoji:'🎀', price:20  },
   { id:'scarf',       slot:'neck',     name:'Skjerf',        emoji:'🧣', price:30  },
   { id:'bandana',     slot:'neck',     name:'Bandana',       emoji:'🏴', price:25  },
+  { id:'necklace',    slot:'neck',     name:'Halskjede',     emoji:'📿', price:55  },
+  // --- ting i rommet (bakgrunnen) ---
+  { id:'plant',       slot:'plant',    name:'Potteplante',   emoji:'🪴', price:35  },
+  { id:'plant2',      slot:'plant2',   name:'Kaktus',        emoji:'🌵', price:30  },
+  { id:'poster',      slot:'poster',   name:'Plakat',        emoji:'🖼️', price:45  },
+  { id:'lamp',        slot:'lamp',     name:'Gulvlampe',     emoji:'🪔', price:50  },
+  { id:'clock',       slot:'clock',    name:'Veggklokke',    emoji:'🕰️', price:40  },
 ];
 
 const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
@@ -41,14 +52,16 @@ const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
 const PACIFIER_HAPPINESS_PER_HOUR = 40;
 
-const SLOT_KEYS = ['petgame_save_slot1', 'petgame_save_slot2', 'petgame_save_slot3', 'petgame_save_slot4'];
+const SLOT_COUNT = 8;
+const SLOT_KEYS = Array.from({length:SLOT_COUNT}, (_,i)=>`petgame_save_slot${i+1}`);
+const SLOT_INDEXES = Array.from({length:SLOT_COUNT}, (_,i)=>i+1);
 const ACTIVE_SLOT_KEY = 'petgame_active_slot';
 const LEGACY_SAVE_KEY = 'petgame_save_v1';
 
 const FOOD_EMOJI = { cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗' };
 const FULL_HUNGER_THRESHOLD = 92;
 
-const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000 };
+const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000, dino:5000, toilet:1600 };
 
 const PLAY_VARIANTS = [
   { key:'bounce',   emoji:'⚽' },
@@ -89,6 +102,7 @@ let dragStartYaw = 0;
 const el = {
   petName: document.getElementById('petName'),
   ageLabel: document.getElementById('ageLabel'),
+  clockLabel: document.getElementById('clockLabel'),
   screens: {
     slots: document.getElementById('screen-slots'),
     select: document.getElementById('screen-select'),
@@ -113,6 +127,11 @@ const el = {
   skySunMoon: document.getElementById('skySunMoon'),
   skyClouds: document.getElementById('skyClouds'),
   skyRain: document.getElementById('skyRain'),
+  roomPlant: document.getElementById('roomPlant'),
+  roomPlant2: document.getElementById('roomPlant2'),
+  roomPoster: document.getElementById('roomPoster'),
+  roomLamp: document.getElementById('roomLamp'),
+  roomClock: document.getElementById('roomClock'),
   eggGrid: document.getElementById('eggGrid'),
   confirmSelect: document.getElementById('btn-confirmSelect'),
   canvasEgg: document.getElementById('canvas-egg'),
@@ -140,6 +159,8 @@ const el = {
   btnBrush: document.getElementById('btn-brush'),
   btnPacifier: document.getElementById('btn-pacifier'),
   btnDrive: document.getElementById('btn-drive'),
+  btnDino: document.getElementById('btn-dino'),
+  btnToilet: document.getElementById('btn-toilet'),
   btnFeed: document.getElementById('btn-feed'),
   btnPlay: document.getElementById('btn-play'),
   btnWash: document.getElementById('btn-wash'),
@@ -162,7 +183,7 @@ function defaultState(){
     muted:false,
     coins:0,
     inventory:[],
-    equipped:{ hat:null, glasses:null, neck:null },
+    equipped:{ hat:null, glasses:null, neck:null, plant:null, plant2:null, poster:null, lamp:null, clock:null },
     stats:{ hunger:100, energy:100, hygiene:100, happiness:100 },
   };
 }
@@ -334,6 +355,15 @@ const SFX = {
   wake:  ()=> { beep(523,0.15,'sine',0.14); beep(659,0.18,'sine',0.14,0.1); },
   grow:  ()=> { [523,659,784,1047,1318].forEach((f,i)=>beep(f,0.2,'sine',0.16,i*0.09)); },
   low:   ()=> { beep(220,0.18,'sawtooth',0.12); },
+  dinoRoar: ()=>{
+    glide(140,60,0.5,'sawtooth',0.16);
+    noiseSweep({ duration:0.45, freqFrom:900, freqTo:200, type:'bandpass', q:0.6, vol:0.14, delay:0.05 });
+    beep(80,0.3,'sawtooth',0.12,0.1);
+  },
+  fart: ()=>{
+    noiseSweep({ duration:0.55, freqFrom:260, freqTo:90, type:'lowpass', q:0.9, vol:0.22 });
+    glide(150,70,0.5,'sawtooth',0.14,0.02);
+  },
 };
 
 /* ---------- Toast ---------- */
@@ -382,11 +412,11 @@ function renderShop(){
         state.coins -= item.price;
         state.inventory = state.inventory || [];
         state.inventory.push(item.id);
-        state.equipped = state.equipped || { hat:null, glasses:null, neck:null };
+        state.equipped = state.equipped || {};
         state.equipped[item.slot] = item.id;
         SFX.tap(); toast(`Kjøpte ${item.name}! 🎉`);
       } else {
-        state.equipped = state.equipped || { hat:null, glasses:null, neck:null };
+        state.equipped = state.equipped || {};
         state.equipped[item.slot] = equipped ? null : item.id;
         SFX.tap();
       }
@@ -433,7 +463,7 @@ function updateEnvironment(){
 function renderSlotPicker(allowCancel){
   const grid = el.slotGrid;
   grid.innerHTML = '';
-  [1,2,3,4].forEach(slotIndex=>{
+  SLOT_INDEXES.forEach(slotIndex=>{
     const raw = loadSlotRaw(slotIndex);
     const card = document.createElement('div');
     card.className = 'slotCard' + (slotIndex===activeSlot ? ' active' : '');
@@ -473,32 +503,38 @@ function renderSlotPicker(allowCancel){
   el.btnMeetup.classList.toggle('hidden', getHatchedSlots().length < 2);
 }
 
-function getHatchedSlots(){ return [1,2,3,4].map(index=>({ index, raw: loadSlotRaw(index) })).filter(s=> s.raw && s.raw.phase==='pet'); }
+function getHatchedSlots(){ return SLOT_INDEXES.map(index=>({ index, raw: loadSlotRaw(index) })).filter(s=> s.raw && s.raw.phase==='pet'); }
 
 function doMeetup(){
   const hatched = getHatchedSlots();
   if(hatched.length < 2) return;
-  const [a, b] = hatched;
-  const raw1 = a.raw, raw2 = b.raw;
 
-  raw1.stats.happiness = Math.min(100, raw1.stats.happiness+20);
-  raw2.stats.happiness = Math.min(100, raw2.stats.happiness+20);
-  localStorage.setItem(SLOT_KEYS[a.index-1], JSON.stringify(raw1));
-  localStorage.setItem(SLOT_KEYS[b.index-1], JSON.stringify(raw2));
-  if(activeSlot===a.index) state.stats.happiness = raw1.stats.happiness;
-  if(activeSlot===b.index) state.stats.happiness = raw2.stats.happiness;
+  // everyone who has a hatched pet gets a happiness boost from the get-together,
+  // however many pets that ends up being (2 up to all SLOT_COUNT slots)
+  hatched.forEach(({raw})=>{ raw.stats.happiness = Math.min(100, raw.stats.happiness+20); });
+  hatched.forEach(({index, raw})=>{
+    localStorage.setItem(SLOT_KEYS[index-1], JSON.stringify(raw));
+    if(activeSlot === index) state.stats.happiness = raw.stats.happiness;
+  });
 
-  el.meetupSubtitle.textContent = `${displayName(raw1)} og ${displayName(raw2)} er glade for å se hverandre! 🎉`;
+  const names = hatched.map(h => displayName(h.raw));
+  el.meetupSubtitle.textContent = names.length === 2
+    ? `${names[0]} og ${names[1]} er glade for å se hverandre! 🎉`
+    : `${names.slice(0,-1).join(', ')} og ${names[names.length-1]} har en fest sammen! 🎉`;
   showScreen('meetup'); SFX.hatch();
 
   const ctx = el.canvasMeetup.getContext('2d');
   ctx.clearRect(0,0,360,260);
-  ctx.save(); ctx.translate(-95,-70);
-  drawCreature(ctx, raw1.species, stageFromProgress(raw1.growthProgress||0), { sad:false, asleep:false, pacifier:false, action:null, yaw:0.35, equipped:raw1.equipped });
-  ctx.restore();
-  ctx.save(); ctx.translate(95,-70);
-  drawCreature(ctx, raw2.species, stageFromProgress(raw2.growthProgress||0), { sad:false, asleep:false, pacifier:false, action:null, yaw:-0.35, equipped:raw2.equipped });
-  ctx.restore();
+  const shown = hatched.slice(0, 4); // cap the visual line-up so it stays readable
+  const n = shown.length;
+  const spacing = n<=2 ? 190 : (n===3 ? 140 : 100);
+  shown.forEach(({raw}, i)=>{
+    const x = (i - (n-1)/2) * spacing;
+    const yaw = x < -1 ? 0.3 : (x > 1 ? -0.3 : 0);
+    ctx.save(); ctx.translate(x, -70);
+    drawCreature(ctx, raw.species, stageFromProgress(raw.growthProgress||0), { sad:false, asleep:false, pacifier:false, action:null, yaw, equipped:raw.equipped });
+    ctx.restore();
+  });
   drawEmojiOverlay(ctx, '💕', 180, 90, 30, 1);
 }
 
@@ -814,6 +850,10 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     extraRotate = 0.08 + Math.sin(action.progress*Math.PI*10)*0.05; extraTY = Math.abs(Math.sin(action.progress*Math.PI*10))*4;
   } else if(action && action.type==='drive'){
     extraScaleX = 0.42; extraScaleY = 0.45; extraTY = 40 + Math.sin(action.progress*Math.PI*12)*2;
+  } else if(action && action.type==='dino'){
+    extraScaleX = 0.5; extraScaleY = 0.5; extraTY = 95 + Math.sin(action.progress*Math.PI*8)*3;
+  } else if(action && action.type==='toilet'){
+    extraScaleY = 0.9; extraTY = 12;
   }
 
   let pulseScale = 1; const pulseRemaining = growthPulseUntil - performance.now();
@@ -927,7 +967,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   if(pacifier){
-    drawPacifier(ctx, 0, 10, 1.1); // Nå riktig plassert og låst til ansiktet
+    drawPacifier(ctx, 0, 19, 1.1); // nipple aligned with the mouth, not the nose
   } else {
     ctx.fillStyle='#3a2a20'; ctx.beginPath(); ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle='#3a2a20'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
@@ -992,6 +1032,10 @@ function computeSharedTransform(opts){
     extraRotate = 0.08 + Math.sin(action.progress*Math.PI*10)*0.05; extraTY = Math.abs(Math.sin(action.progress*Math.PI*10))*4;
   } else if(action && action.type==='drive'){
     extraScaleX = 0.5; extraScaleY = 0.5; extraTY = 34 + Math.sin(action.progress*Math.PI*12)*2;
+  } else if(action && action.type==='dino'){
+    extraScaleX = 0.55; extraScaleY = 0.55; extraTY = 60 + Math.sin(action.progress*Math.PI*8)*3;
+  } else if(action && action.type==='toilet'){
+    extraScaleY = 0.92; extraTY = 10;
   }
   let pulseScale = 1; const pulseRemaining = growthPulseUntil - performance.now();
   if(pulseRemaining > 0){ const p = 1 - pulseRemaining/700; pulseScale = 1 + Math.sin(Math.min(p,1)*Math.PI)*0.3; }
@@ -1012,7 +1056,7 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR
     const bx = Math.sin(action.progress*Math.PI*12)*6;
     drawEmojiOverlay(ctx, '🪥', mouthX+bx, mouthY, 22, 1);
   }
-  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY, hs*0.8);
+  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY + 4*hs*0.8, hs*0.8);
   if(equipped && equipped.glasses) drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
   if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.55, headR*0.42, hs*0.55);
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-headR*1.6, headY+headR*0.3, hs*0.6);
@@ -1331,6 +1375,96 @@ function drawCarBody(ctx, progress){
   ctx.restore();
 }
 
+function doDino(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(currentAction) return;
+
+  triggerAction('dino'); SFX.dinoRoar(); spawnEmojiBurst('🦖', 3);
+  state.stats.happiness = clamp(state.stats.happiness+20); state.stats.energy = clamp(state.stats.energy-6);
+  earnCoins(5); toast('Ri på dinosaur! 🦖'); saveState(); setTimeout(()=>{ toast('For en tur på dinosaur! 🌴'); }, ACTION_DURATIONS.dino-400);
+}
+
+function drawDinoBody(ctx, progress){
+  const walk = Math.sin(progress*Math.PI*8);
+  ctx.save(); ctx.translate(180, 265+Math.abs(walk)*3);
+
+  // dust puffs under feet
+  ctx.strokeStyle='rgba(120,90,50,0.35)'; ctx.lineWidth=3; ctx.lineCap='round';
+  for(let i=0;i<3;i++){
+    const dx = -70+i*70; const wobble=(progress*260)%40;
+    ctx.beginPath(); ctx.moveTo(dx-wobble, 58); ctx.lineTo(dx-14-wobble, 58); ctx.stroke();
+  }
+
+  // tail
+  ctx.fillStyle='#3f9d4a';
+  ctx.beginPath(); ctx.moveTo(-70,10); ctx.quadraticCurveTo(-140,-6+walk*3,-165,-20+walk*4); ctx.quadraticCurveTo(-140,14,-70,34); ctx.closePath(); ctx.fill();
+
+  // back legs (walk cycle)
+  [1,-1].forEach(side=>{
+    ctx.save(); ctx.translate(30*side, 30); ctx.rotate(side*walk*0.25);
+    ctx.fillStyle='#3a8f45'; ctx.beginPath(); ctx.moveTo(-14,0); ctx.lineTo(14,0); ctx.lineTo(10,45); ctx.lineTo(-10,45); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#2f7a39'; ctx.beginPath(); ctx.ellipse(0,47,13,7,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+
+  // body
+  ctx.fillStyle='#4caf50'; ctx.beginPath(); ctx.ellipse(0,0,78,44,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#eaf7e0'; ctx.beginPath(); ctx.ellipse(6,20,48,20,0,0,Math.PI*2); ctx.fill();
+
+  // back spikes/ridges
+  ctx.fillStyle='#2f7a39';
+  for(let i=0;i<5;i++){
+    const sx=-60+i*30, sy=-32+Math.sin(i)*3;
+    ctx.beginPath(); ctx.moveTo(sx-8,sy+8); ctx.lineTo(sx,sy-14); ctx.lineTo(sx+8,sy+8); ctx.closePath(); ctx.fill();
+  }
+
+  // stubby arms
+  [1,-1].forEach(side=>{
+    ctx.save(); ctx.translate(46*side, 6); ctx.rotate(side*0.3);
+    ctx.fillStyle='#3f9d4a'; ctx.beginPath(); ctx.ellipse(0,0,8,18,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+
+  // head + jaw
+  ctx.save(); ctx.translate(88,-16); ctx.rotate(walk*0.05);
+  ctx.fillStyle='#4caf50'; ctx.beginPath(); ctx.ellipse(0,0,34,26,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#eaf7e0'; ctx.beginPath(); ctx.moveTo(-6,10); ctx.quadraticCurveTo(24,16,30,4+Math.abs(walk)*6); ctx.quadraticCurveTo(14,20,-6,20); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fff';
+  for(let t=0;t<3;t++){ ctx.beginPath(); ctx.moveTo(6+t*8,12); ctx.lineTo(9+t*8,17); ctx.lineTo(3+t*8,17); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle='#1c1c1c'; ctx.beginPath(); ctx.arc(6,-10,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function doToilet(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(state.pacifier) return toast('Har smokk i munnen 🍼');
+  if(currentAction) return;
+
+  triggerAction('toilet'); SFX.fart(); spawnEmojiBurst('💨', 4);
+  state.stats.happiness = clamp(state.stats.happiness+10); state.stats.hygiene = clamp(state.stats.hygiene-8);
+  earnCoins(2); toast('Fiiuu, mye bedre! 💨'); saveState();
+}
+
+function drawToiletOverlay(ctx, progress){
+  ctx.save(); ctx.translate(180, 250);
+  ctx.fillStyle='#e8eef2'; ctx.fillRect(-46,-10,92,26);
+  ctx.fillStyle='#d4dde3'; ctx.fillRect(-30,-38,60,30);
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(0,16,40,18,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=2; ctx.stroke();
+  const puffCount = 4;
+  for(let i=0;i<puffCount;i++){
+    const p = (progress + i/puffCount) % 1;
+    const alpha = Math.sin(p*Math.PI);
+    ctx.globalAlpha = Math.max(0, alpha*0.8);
+    ctx.font = `${18+p*14}px sans-serif`;
+    ctx.fillText('💨', 30+i*8-20*p, -40-p*40);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function doTogglePacifier(){
   state.pacifier = !state.pacifier;
   if(state.pacifier){ SFX.pacifierIn(); toast('God og rolig 🍼'); } else { SFX.pacifierOut(); toast('Smokk ut!'); }
@@ -1367,25 +1501,58 @@ function tick(){
     ctx.clearRect(0,0,el.canvasPet.width, el.canvasPet.height);
     const currentActionProgress = getActionProgress();
     if(currentActionProgress && currentActionProgress.type==='drive') drawCarBody(ctx, currentActionProgress.progress);
-    
+    if(currentActionProgress && currentActionProgress.type==='dino') drawDinoBody(ctx, currentActionProgress.progress);
+
     drawCreature(ctx, state.species, stage, {
       sad:isNeedy(), asleep:state.sleeping, pacifier:state.pacifier,
       action:currentActionProgress, yaw:petYaw, equipped:state.equipped,
     });
 
-    const hours = state.birthTime ? (Date.now()-state.birthTime)/3600000 : 0;
-    const days = Math.floor(hours/24); const hrs = Math.floor(hours%24);
-    el.petName.textContent = `${displayName(state)} • ${STAGE_LABELS[stage]}`;
-    el.ageLabel.textContent = days>0 ? `${days}d ${hrs}t gammel` : `${hrs}t gammel`;
+    if(currentActionProgress && currentActionProgress.type==='toilet') drawToiletOverlay(ctx, currentActionProgress.progress);
 
-    refreshSleepUI(); refreshPacifierUI(); refreshCoinUI();
+    el.petName.textContent = `${displayName(state)} • ${STAGE_LABELS[stage]}`;
+    const hours = state.birthTime ? (Date.now()-state.birthTime)/3600000 : 0;
+    el.ageLabel.textContent = formatAge(hours);
+
+    refreshSleepUI(); refreshPacifierUI(); refreshCoinUI(); refreshRoomDecor();
     el.btnSleep.querySelector('.icon').textContent = state.sleeping ? '☀️' : '💤';
     el.btnSleep.querySelector('.label').textContent = state.sleeping ? 'Våkne' : 'Sov';
     el.btnDrive.classList.toggle('hidden', stage !== 'adult');
 
-    if(Date.now() - lastEnvUpdate > 30000){ updateEnvironment(); lastEnvUpdate = Date.now(); }
+    if(Date.now() - lastEnvUpdate > 30000){ updateEnvironment(); updateClock(); lastEnvUpdate = Date.now(); }
   }
   requestAnimationFrame(tick);
+}
+
+/* ---------- Age display & clock ---------- */
+
+function formatAge(hours){
+  // 1 virtual "year" = 1 real day (24t), 12 "months" per year
+  const totalMonths = hours/2;
+  const years = Math.floor(totalMonths/12);
+  const months = Math.floor(totalMonths%12);
+  if(years > 0) return months>0 ? `${years} år ${months} mnd` : `${years} år`;
+  if(months > 0) return `${months} mnd gammel`;
+  const minutes = Math.floor(hours*60);
+  return `${minutes} min gammel`;
+}
+
+function updateClock(){
+  const now = new Date();
+  const hour = now.getHours();
+  const isDay = hour>=6 && hour<20;
+  const hh = String(hour).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  el.clockLabel.textContent = `${isDay?'☀️':'🌙'} ${hh}:${mm}`;
+}
+
+function refreshRoomDecor(){
+  const eq = state.equipped || {};
+  el.roomPlant.classList.toggle('hidden', eq.plant !== 'plant');
+  el.roomPlant2.classList.toggle('hidden', eq.plant2 !== 'plant2');
+  el.roomPoster.classList.toggle('hidden', eq.poster !== 'poster');
+  el.roomLamp.classList.toggle('hidden', eq.lamp !== 'lamp');
+  el.roomClock.classList.toggle('hidden', eq.clock !== 'clock');
 }
 
 /* ---------- Init ---------- */
@@ -1404,6 +1571,7 @@ function init(){
   el.btnJump.addEventListener('click', doJump); el.btnCycle.addEventListener('click', doCycle);
   el.btnBrush.addEventListener('click', doBrushTeeth); el.btnPacifier.addEventListener('click', doTogglePacifier);
   el.btnDrive.addEventListener('click', doDrive);
+  el.btnDino.addEventListener('click', doDino); el.btnToilet.addEventListener('click', doToilet);
 
   el.btnRestart.addEventListener('click', ()=>{ renderSlotPicker(true); showScreen('slots'); });
   el.btnCloseSlots.addEventListener('click', ()=> showScreen(lastNonSlotScreen) );
@@ -1417,7 +1585,7 @@ function init(){
   });
   el.btnCloseShop.addEventListener('click', ()=> showScreen('pet') );
 
-  applyElapsed(); updateEnvironment();
+  applyElapsed(); updateEnvironment(); updateClock();
 
   if(!activeSlot){ renderSlotPicker(false); showScreen('slots'); }
   else if(state.phase === 'pet' && state.species){ showScreen('pet'); lastStageSeen = getStage(); }

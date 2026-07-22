@@ -57,6 +57,7 @@ html,body{
 }
 #petName{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #ageLabel{ font-size:0.8rem; opacity:.75; font-weight:400; white-space:nowrap; }
+#clockLabel{ font-size:0.8rem; opacity:.85; font-weight:600; white-space:nowrap; }
 
 #btn-restart{
   flex:none;
@@ -364,6 +365,20 @@ html,body{
   opacity:0.35;
   border-radius:50%;
 }
+.roomDecor{
+  position:absolute;
+  font-size:2rem;
+  filter:drop-shadow(0 3px 3px rgba(0,0,0,0.25));
+  pointer-events:none;
+  z-index:1;
+}
+.roomDecor.hidden{ display:none; }
+#roomPlant{ left:4%; bottom:18%; font-size:2.6rem; }
+#roomPlant2{ right:6%; bottom:16%; font-size:2.2rem; }
+#roomPoster{ left:10%; top:12%; font-size:2.4rem; }
+#roomLamp{ left:4%; top:6%; font-size:2rem; }
+#roomClock{ left:38%; top:10%; font-size:1.8rem; }
+
 #roomWindow{
   position:absolute;
   top:8%;

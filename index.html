@@ -21,6 +21,7 @@
     <header id="topbar">
       <div id="petName" title="Trykk for å gi nytt navn">Kjæledyr-egg</div>
       <div id="ageLabel"></div>
+      <div id="clockLabel" title="Klokka nå"></div>
       <button id="btn-coins" title="Butikk">🪙 <span id="coinCount">0</span></button>
       <button id="btn-restart" title="Bytt / slett lagring">⋮</button>
     </header>
@@ -103,6 +104,11 @@
             </div>
             <div id="roomRug"></div>
             <div id="roomFloor"></div>
+            <div id="roomPlant" class="roomDecor hidden">🪴</div>
+            <div id="roomPlant2" class="roomDecor hidden">🌵</div>
+            <div id="roomPoster" class="roomDecor hidden">🖼️</div>
+            <div id="roomLamp" class="roomDecor hidden">🪔</div>
+            <div id="roomClock" class="roomDecor hidden">🕰️</div>
           </div>
           <canvas id="canvas-pet" width="360" height="360"></canvas>
           <div id="sleepOverlay" class="hidden"></div>
@@ -138,6 +144,9 @@
         <button class="actionBtn hidden" id="btn-drive" title="Kjør bil">
           <span class="icon">🚗</span><span class="label">Bil</span>
         </button>
+        <button class="actionBtn" id="btn-dino" title="Ri på dinosaur">
+          <span class="icon">🦖</span><span class="label">Dino</span>
+        </button>
       </div>
       <div class="actionRow">
         <button class="actionBtn" id="btn-feed" title="Mat">
@@ -151,6 +160,9 @@
         </button>
         <button class="actionBtn" id="btn-sleep" title="Sov">
           <span class="icon">💤</span><span class="label">Sov</span>
+        </button>
+        <button class="actionBtn" id="btn-toilet" title="Toalett">
+          <span class="icon">🚽</span><span class="label">Do</span>
         </button>
       </div>
     </nav>
