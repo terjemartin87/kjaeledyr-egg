@@ -469,7 +469,7 @@ function updateEnvironment(){
 function renderSlotPicker(allowCancel){
   const grid = el.slotGrid;
   grid.innerHTML = '';
-  [1,2,3].forEach(slotIndex=>{
+  [1,2,3,4].forEach(slotIndex=>{
     const raw = loadSlotRaw(slotIndex);
     const card = document.createElement('div');
     card.className = 'slotCard' + (slotIndex===activeSlot ? ' active' : '');
@@ -524,7 +524,7 @@ function renderSlotPicker(allowCancel){
 /* ---------- Meetup between two of the saved pets ---------- */
 
 function getHatchedSlots(){
-  return [1,2,3]
+  return [1,2,3,4]
     .map(index=>({ index, raw: loadSlotRaw(index) }))
     .filter(s=> s.raw && s.raw.phase==='pet');
 }
