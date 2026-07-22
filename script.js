@@ -46,14 +46,14 @@ const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
 const PACIFIER_HAPPINESS_PER_HOUR = 40;
 
-const SLOT_KEYS = ['petgame_save_slot1', 'petgame_save_slot2'];
+const SLOT_KEYS = ['petgame_save_slot1', 'petgame_save_slot2', 'petgame_save_slot3'];
 const ACTIVE_SLOT_KEY = 'petgame_active_slot';
 const LEGACY_SAVE_KEY = 'petgame_save_v1';
 
 const FOOD_EMOJI = { cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗' };
 const FULL_HUNGER_THRESHOLD = 92;
 
-const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800 };
+const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000 };
 
 const PLAY_VARIANTS = [
   { key:'bounce',   emoji:'⚽' },
@@ -144,6 +144,7 @@ const el = {
   btnCycle: document.getElementById('btn-cycle'),
   btnBrush: document.getElementById('btn-brush'),
   btnPacifier: document.getElementById('btn-pacifier'),
+  btnDrive: document.getElementById('btn-drive'),
   btnFeed: document.getElementById('btn-feed'),
   btnPlay: document.getElementById('btn-play'),
   btnWash: document.getElementById('btn-wash'),
@@ -347,6 +348,14 @@ const SFX = {
     beep(1046,0.16,'sine',0.12,10*0.12+0.1);
     beep(1318,0.18,'sine',0.1,10*0.12+0.22);
   },
+  drive: ()=>{
+    beep(280,0.35,'square',0.1);
+    beep(220,0.4,'sawtooth',0.06,0.1);
+    for(let i=0;i<6;i++){
+      noiseBurst({ duration:0.15, freq:150+Math.random()*60, q:1, type:'lowpass', vol:0.1, delay:0.5+i*0.7 });
+    }
+    beep(660,0.1,'square',0.1,0.05); beep(880,0.12,'square',0.08,0.18); // beep beep!
+  },
   pacifierIn: ()=> glide(500,300,0.4,'sine',0.1),
   pacifierOut: ()=>{ beep(700,0.1,'square',0.12); beep(900,0.12,'square',0.1,0.08); },
   sleep:    ()=> { beep(392,0.3,'sine',0.12); beep(330,0.35,'sine',0.1,0.2); },
@@ -460,7 +469,7 @@ function updateEnvironment(){
 function renderSlotPicker(allowCancel){
   const grid = el.slotGrid;
   grid.innerHTML = '';
-  [1,2].forEach(slotIndex=>{
+  [1,2,3].forEach(slotIndex=>{
     const raw = loadSlotRaw(slotIndex);
     const card = document.createElement('div');
     card.className = 'slotCard' + (slotIndex===activeSlot ? ' active' : '');
@@ -509,23 +518,29 @@ function renderSlotPicker(allowCancel){
   });
   el.btnCloseSlots.classList.toggle('hidden', !allowCancel);
 
-  const raw1 = loadSlotRaw(1), raw2 = loadSlotRaw(2);
-  const bothHavePets = raw1 && raw1.phase==='pet' && raw2 && raw2.phase==='pet';
-  el.btnMeetup.classList.toggle('hidden', !bothHavePets);
+  el.btnMeetup.classList.toggle('hidden', getHatchedSlots().length < 2);
 }
 
-/* ---------- Meetup between the two saved pets ---------- */
+/* ---------- Meetup between two of the saved pets ---------- */
+
+function getHatchedSlots(){
+  return [1,2,3]
+    .map(index=>({ index, raw: loadSlotRaw(index) }))
+    .filter(s=> s.raw && s.raw.phase==='pet');
+}
 
 function doMeetup(){
-  const raw1 = loadSlotRaw(1), raw2 = loadSlotRaw(2);
-  if(!raw1 || raw1.phase!=='pet' || !raw2 || raw2.phase!=='pet') return;
+  const hatched = getHatchedSlots();
+  if(hatched.length < 2) return;
+  const [a, b] = hatched;
+  const raw1 = a.raw, raw2 = b.raw;
 
   raw1.stats.happiness = Math.min(100, raw1.stats.happiness+20);
   raw2.stats.happiness = Math.min(100, raw2.stats.happiness+20);
-  localStorage.setItem(SLOT_KEYS[0], JSON.stringify(raw1));
-  localStorage.setItem(SLOT_KEYS[1], JSON.stringify(raw2));
-  if(activeSlot===1) state.stats.happiness = raw1.stats.happiness;
-  if(activeSlot===2) state.stats.happiness = raw2.stats.happiness;
+  localStorage.setItem(SLOT_KEYS[a.index-1], JSON.stringify(raw1));
+  localStorage.setItem(SLOT_KEYS[b.index-1], JSON.stringify(raw2));
+  if(activeSlot===a.index) state.stats.happiness = raw1.stats.happiness;
+  if(activeSlot===b.index) state.stats.happiness = raw2.stats.happiness;
 
   el.meetupSubtitle.textContent = `${displayName(raw1)} og ${displayName(raw2)} er glade for å se hverandre! 🎉`;
   showScreen('meetup');
@@ -1898,6 +1913,75 @@ function doBrushTeeth(){
   setTimeout(()=>{ toast('Skinnende rene tenner! 🪥✨'); spawnSparkles(4); }, ACTION_DURATIONS.brush*0.7);
 }
 
+function doDrive(){
+  if(state.sleeping) return toast('Zzz... sover nå 💤');
+  if(currentAction) return;
+  if(getStage() !== 'adult') return toast('For lite til å kjøre bil ennå 🚗');
+
+  triggerAction('drive');
+  SFX.drive();
+  spawnEmojiBurst('💨', 4);
+  state.stats.happiness = clamp(state.stats.happiness+18);
+  state.stats.energy = clamp(state.stats.energy-8);
+  state.stats.hunger = clamp(state.stats.hunger-6);
+  earnCoins(5);
+  toast('Kjører en tur! 🚗');
+  saveState();
+  setTimeout(()=>{ toast('Så gøy tur det var! 🎉'); }, ACTION_DURATIONS.drive-400);
+}
+
+function drawCarBody(ctx, progress){
+  const wheelRot = progress*Math.PI*16;
+  ctx.save();
+  ctx.translate(180, 258);
+
+  ctx.strokeStyle='rgba(255,255,255,0.55)';
+  ctx.lineWidth=3;
+  ctx.lineCap='round';
+  for(let i=0;i<4;i++){
+    const ly = -22+i*15;
+    const wobble = (progress*420) % 60;
+    ctx.beginPath(); ctx.moveTo(-135-wobble, ly); ctx.lineTo(-165-wobble, ly); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(135+wobble, ly); ctx.lineTo(165+wobble, ly); ctx.stroke();
+  }
+
+  ctx.fillStyle='#e0555f';
+  ctx.beginPath();
+  ctx.moveTo(-92,22);
+  ctx.quadraticCurveTo(-92,-32,-48,-38);
+  ctx.lineTo(48,-38);
+  ctx.quadraticCurveTo(92,-32,92,22);
+  ctx.lineTo(92,42);
+  ctx.lineTo(-92,42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.15)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+
+  ctx.fillStyle='rgba(200,230,255,0.65)';
+  ctx.beginPath();
+  ctx.moveTo(-42,-35); ctx.lineTo(42,-35); ctx.lineTo(32,2); ctx.lineTo(-32,2);
+  ctx.closePath();
+  ctx.fill();
+
+  [-56,56].forEach(wx=>{
+    ctx.save();
+    ctx.translate(wx, 42);
+    ctx.rotate(wheelRot);
+    ctx.beginPath(); ctx.arc(0,0,19,0,Math.PI*2); ctx.fillStyle='#2a2a2a'; ctx.fill();
+    ctx.strokeStyle='#999'; ctx.lineWidth=2.5;
+    for(let s=0;s<4;s++){
+      ctx.beginPath(); ctx.moveTo(-19,0); ctx.lineTo(19,0); ctx.stroke();
+      ctx.rotate(Math.PI/4);
+    }
+    ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fillStyle='#ccc'; ctx.fill();
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
 function doTogglePacifier(){
   state.pacifier = !state.pacifier;
   if(state.pacifier){ SFX.pacifierIn(); toast('God og rolig 🍼'); }
@@ -1950,9 +2034,13 @@ function tick(){
 
     const ctx = el.canvasPet.getContext('2d');
     ctx.clearRect(0,0,el.canvasPet.width, el.canvasPet.height);
+    const currentActionProgress = getActionProgress();
+    if(currentActionProgress && currentActionProgress.type==='drive'){
+      drawCarBody(ctx, currentActionProgress.progress);
+    }
     drawCreature(ctx, state.species, stage, {
       sad:isNeedy(), asleep:state.sleeping, pacifier:state.pacifier,
-      action:getActionProgress(), yaw:petYaw, equipped:state.equipped,
+      action:currentActionProgress, yaw:petYaw, equipped:state.equipped,
     });
 
     const hours = state.birthTime ? (Date.now()-state.birthTime)/3600000 : 0;
@@ -1966,6 +2054,7 @@ function tick(){
     refreshCoinUI();
     el.btnSleep.querySelector('.icon').textContent = state.sleeping ? '☀️' : '💤';
     el.btnSleep.querySelector('.label').textContent = state.sleeping ? 'Våkne' : 'Sov';
+    el.btnDrive.classList.toggle('hidden', stage !== 'adult');
 
     if(Date.now() - lastEnvUpdate > 30000){
       updateEnvironment();
@@ -2000,6 +2089,7 @@ function init(){
   el.btnCycle.addEventListener('click', doCycle);
   el.btnBrush.addEventListener('click', doBrushTeeth);
   el.btnPacifier.addEventListener('click', doTogglePacifier);
+  el.btnDrive.addEventListener('click', doDrive);
 
   el.btnRestart.addEventListener('click', ()=>{
     renderSlotPicker(true);

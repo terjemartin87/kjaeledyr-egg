@@ -524,4 +524,5 @@ html,body{
 .actionBtn .icon svg{ display:block; }
 .actionBtn .label{ font-size:.6rem; opacity:.75; }
 .actionBtn.disabled{ opacity:.35; pointer-events:none; }
+.actionBtn.hidden{ display:none; }
 .actionBtn.activeToggle{ background:rgba(79,168,232,0.28); border-color:rgba(79,168,232,0.5); }
