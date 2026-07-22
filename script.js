@@ -775,21 +775,27 @@ function drawPacifier(ctx, x, y, scale=1){
   ctx.restore();
 }
 
-function drawAccessory(ctx, id, eyeY, eyeDX){
+// originX/originY = "eye level" anchor point; spread = half-distance between
+// eyes (for glasses); scale lets the same shapes fit tiny reptile heads too.
+function drawAccessory(ctx, id, originX, originY, spread, scale=1){
+  ctx.save();
+  ctx.translate(originX, originY);
+  ctx.scale(scale, scale);
+  const eyeDX = spread;
   switch(id){
     case 'cap':
       ctx.fillStyle='#4fa8e8';
       ctx.beginPath();
-      ctx.arc(0, eyeY-18, 26, Math.PI, 0);
+      ctx.arc(0, -18, 26, Math.PI, 0);
       ctx.fill();
       ctx.fillStyle='#3a86c2';
       ctx.beginPath();
-      ctx.ellipse(16, eyeY-18, 15, 5, 0, 0, Math.PI*2);
+      ctx.ellipse(16, -18, 15, 5, 0, 0, Math.PI*2);
       ctx.fill();
       break;
     case 'partyhat':
       ctx.save();
-      ctx.translate(0, eyeY-16);
+      ctx.translate(0, -16);
       ctx.rotate(0.18);
       ctx.beginPath();
       ctx.moveTo(-14,0); ctx.lineTo(14,0); ctx.lineTo(0,-38);
@@ -802,39 +808,39 @@ function drawAccessory(ctx, id, eyeY, eyeDX){
       break;
     case 'tophat':
       ctx.fillStyle='#2a2a2a';
-      ctx.fillRect(-15, eyeY-48, 30, 28);
+      ctx.fillRect(-15, -48, 30, 28);
       ctx.beginPath();
-      ctx.ellipse(0, eyeY-20, 23, 6.5, 0, 0, Math.PI*2);
+      ctx.ellipse(0, -20, 23, 6.5, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.fillStyle='#c73c3c';
-      ctx.fillRect(-15, eyeY-27, 30, 5);
+      ctx.fillRect(-15, -27, 30, 5);
       break;
     case 'crown':
       ctx.fillStyle='#ffd76b';
       ctx.beginPath();
-      ctx.moveTo(-22, eyeY-18);
-      ctx.lineTo(-22, eyeY-32);
-      ctx.lineTo(-11, eyeY-22);
-      ctx.lineTo(0, eyeY-36);
-      ctx.lineTo(11, eyeY-22);
-      ctx.lineTo(22, eyeY-32);
-      ctx.lineTo(22, eyeY-18);
+      ctx.moveTo(-22, -18);
+      ctx.lineTo(-22, -32);
+      ctx.lineTo(-11, -22);
+      ctx.lineTo(0, -36);
+      ctx.lineTo(11, -22);
+      ctx.lineTo(22, -32);
+      ctx.lineTo(22, -18);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle='#e0555f';
-      [-11,0,11].forEach(x=>{ ctx.beginPath(); ctx.arc(x, eyeY-24, 2.5, 0, Math.PI*2); ctx.fill(); });
+      [-11,0,11].forEach(x=>{ ctx.beginPath(); ctx.arc(x, -24, 2.5, 0, Math.PI*2); ctx.fill(); });
       break;
     case 'sunglasses':
       ctx.fillStyle='#1a1a1a';
       [-1,1].forEach(dir=>{
         ctx.beginPath();
-        ctx.ellipse(dir*eyeDX, eyeY, 9, 6.5, 0, 0, Math.PI*2);
+        ctx.ellipse(dir*eyeDX, 0, 9, 6.5, 0, 0, Math.PI*2);
         ctx.fill();
       });
       ctx.strokeStyle='#1a1a1a';
       ctx.lineWidth=2.5;
       ctx.beginPath();
-      ctx.moveTo(-eyeDX+8, eyeY); ctx.lineTo(eyeDX-8, eyeY);
+      ctx.moveTo(-eyeDX+8, 0); ctx.lineTo(eyeDX-8, 0);
       ctx.stroke();
       break;
     case 'nerdglasses':
@@ -842,17 +848,21 @@ function drawAccessory(ctx, id, eyeY, eyeDX){
       ctx.lineWidth=2.5;
       [-1,1].forEach(dir=>{
         ctx.beginPath();
-        ctx.arc(dir*eyeDX, eyeY, 9, 0, Math.PI*2);
+        ctx.arc(dir*eyeDX, 0, 9, 0, Math.PI*2);
         ctx.stroke();
       });
       ctx.beginPath();
-      ctx.moveTo(-eyeDX+9, eyeY); ctx.lineTo(eyeDX-9, eyeY);
+      ctx.moveTo(-eyeDX+9, 0); ctx.lineTo(eyeDX-9, 0);
       ctx.stroke();
       break;
   }
+  ctx.restore();
 }
 
-function drawNeckAccessory(ctx, id){
+function drawNeckAccessory(ctx, id, originX=0, originY=0, scale=1){
+  ctx.save();
+  ctx.translate(originX, originY);
+  ctx.scale(scale, scale);
   switch(id){
     case 'bowtie':
       ctx.fillStyle='#e0555f';
@@ -878,6 +888,7 @@ function drawNeckAccessory(ctx, id){
       [-12,0,12].forEach(x=>{ ctx.beginPath(); ctx.arc(x,26,2,0,Math.PI*2); ctx.fill(); });
       break;
   }
+  ctx.restore();
 }
 
 function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
@@ -1080,7 +1091,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   // equipped glasses (drawn over the eyes)
   const equipped = opts.equipped;
   if(equipped && equipped.glasses && !closedEyes){
-    drawAccessory(ctx, equipped.glasses, eyeY, eyeDX);
+    drawAccessory(ctx, equipped.glasses, 0, eyeY, eyeDX, 1);
   }
 
   // whiskers (cat)
@@ -1159,7 +1170,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   // equipped hat (drawn last so it sits on top of everything, including ears)
   if(equipped && equipped.hat){
-    drawAccessory(ctx, equipped.hat, eyeY, eyeDX);
+    drawAccessory(ctx, equipped.hat, 0, eyeY, eyeDX, 1);
   }
 
   // action overlays (food, soap, toothbrush)
@@ -1392,9 +1403,10 @@ function computeSharedTransform(opts){
   return { extraTX, extraTY, extraRotate, extraScaleX, extraScaleY, chompProgress, pulseScale };
 }
 
-function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY){
+function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR){
   const action = opts.action;
   const equipped = opts.equipped;
+  const hs = headR/22; // scale factor so mammal-sized accessory art fits the small reptile head
   if(action && action.type==='eat'){
     const foodEmoji = FOOD_EMOJI[speciesKey] || '🍎';
     if(t.chompProgress<1){
@@ -1417,10 +1429,16 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY){
     drawEmojiOverlay(ctx, '🪥', headX+bx, headY+6, 22, 1);
   }
   if(opts.pacifier){
-    drawPacifier(ctx, headX, headY+8, 0.85);
+    drawPacifier(ctx, headX, headY+headR*0.45, hs*0.8);
+  }
+  if(equipped && equipped.glasses){
+    drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
+  }
+  if(equipped && equipped.hat){
+    drawAccessory(ctx, equipped.hat, headX, headY-headR*0.55, headR*0.42, hs*0.55);
   }
   if(equipped && equipped.neck){
-    drawNeckAccessory(ctx, equipped.neck);
+    drawNeckAccessory(ctx, equipped.neck, headX-headR*1.6, headY+headR*0.3, hs*0.6);
   }
 }
 
@@ -1510,7 +1528,7 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
     ctx.stroke();
   }
 
-  drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY);
+  drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR);
 
   ctx.restore();
 }
@@ -1631,7 +1649,7 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   else { ctx.moveTo(headX+10,headY+12); ctx.quadraticCurveTo(headX+18,headY+17,headX+26,headY+12); }
   ctx.stroke();
 
-  drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY);
+  drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR);
 
   ctx.restore();
 }
