@@ -509,8 +509,6 @@ function doMeetup(){
   const hatched = getHatchedSlots();
   if(hatched.length < 2) return;
 
-  // everyone who has a hatched pet gets a happiness boost from the get-together,
-  // however many pets that ends up being (2 up to all SLOT_COUNT slots)
   hatched.forEach(({raw})=>{ raw.stats.happiness = Math.min(100, raw.stats.happiness+20); });
   hatched.forEach(({index, raw})=>{
     localStorage.setItem(SLOT_KEYS[index-1], JSON.stringify(raw));
@@ -525,7 +523,7 @@ function doMeetup(){
 
   const ctx = el.canvasMeetup.getContext('2d');
   ctx.clearRect(0,0,360,260);
-  const shown = hatched.slice(0, 4); // cap the visual line-up so it stays readable
+  const shown = hatched.slice(0, 4);
   const n = shown.length;
   const spacing = n<=2 ? 190 : (n===3 ? 140 : 100);
   shown.forEach(({raw}, i)=>{
@@ -661,7 +659,7 @@ function drawPacifier(ctx, x, y, scale=1){
   ctx.beginPath(); ctx.ellipse(0, 0, 10.5, 7.5, 0, 0, Math.PI*2); ctx.fillStyle='#4fa8e8'; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1; ctx.stroke();
   // Gjenskinn
   ctx.beginPath(); ctx.ellipse(-3, -2, 4, 2.4, -0.3, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fill();
-  // "Tutten" / knappen på utsiden er nå en sentrert, fin knapp
+  // "Tutten" / knappen på utsiden
   ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 4.5, 0, 0, Math.PI*2); ctx.fillStyle='#f4d9b8'; ctx.fill();
   ctx.restore();
 }

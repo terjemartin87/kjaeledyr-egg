@@ -16,23 +16,25 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
 
 html,body{
-  height:100%;
-  margin:0;
-  font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  height: 100vh; /* Fallback for veldig gamle nettlesere */
+  height: 100dvh; /* Sikrer at alt passer inni skjermen selv om adresselinjen spretter opp */
+  margin: 0;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   background: radial-gradient(circle at 30% 20%, var(--bg2), var(--bg1) 70%);
-  color:var(--text);
-  overflow:hidden;
+  color: var(--text);
+  overflow: hidden;
 }
 
 #device{
-  position:relative;
-  max-width:480px;
-  min-height:100dvh;
-  margin:0 auto;
-  display:flex;
-  flex-direction:column;
-  background:linear-gradient(180deg,#3a3f4d,#23262f);
-  box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  position: relative;
+  max-width: 480px;
+  height: 100dvh; /* Endret fra min-height til height for å tvinge innholdet til å holde seg innenfor skjermen */
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg,#3a3f4d,#23262f);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  overflow: hidden; /* Hindrer elementer fra å stikke ut på bunnen */
 }
 
 @media (min-width:520px){
@@ -138,7 +140,8 @@ html,body{
 .statFill.bad{ background:linear-gradient(180deg, var(--bad), #c73c3c); }
 
 #stage{
-  flex:1;
+  flex: 1;
+  min-height: 0; /* KRITISK: Tillater at rommet/dyret krymper for å gi plass til bunnmenyen */
   position:relative;
   background:var(--screen);
   border-radius:26px 26px 0 0;
@@ -161,10 +164,6 @@ html,body{
   -webkit-overflow-scrolling:touch;
 }
 .screen.hidden{ display:none; }
-/* Center content vertically when it fits, but degrade to normal
-   top-aligned scrolling on short/older phone screens instead of
-   clipping - "margin:auto" on the end children is more broadly
-   supported than justify-content:safe center. */
 .screen > *:first-child{ margin-top:auto; }
 .screen > *:last-child{ margin-bottom:auto; }
 
@@ -309,23 +308,29 @@ html,body{
 .hint{ margin-top:10px; opacity:.55; font-size:.85rem; }
 
 #screen-pet{
-  padding:0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 #petViewport{
-  position:relative;
-  width:100%;
-  height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto; /* Lar visningsområdet for dyret vokse og krympe fritt */
+  min-height: 0; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 #canvas-pet{
-  width:min(80vw,340px);
-  height:min(80vw,340px);
-  touch-action:none;
-  cursor:grab;
-  position:relative;
-  z-index:2;
+  width: min(80vw,340px);
+  height: min(80vw,340px);
+  max-height: 48vh; /* Begrenser max-høyde basert på skjermen for å sikre plass til meny */
+  max-width: 48vh;
+  touch-action: none;
+  cursor: grab;
+  position: relative;
+  z-index: 2;
 }
 #canvas-pet:active{ cursor:grabbing; }
 
@@ -510,17 +515,21 @@ html,body{
 #toast.show{ opacity:1; top:16px; }
 
 #actions{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  padding:10px 10px calc(10px + env(safe-area-inset-bottom));
-  background:linear-gradient(180deg,#2c303c,#20232b);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg,#2c303c,#20232b);
+  flex-shrink: 0; /* Hindrer menyen i å bli klemt flat på kort skjerm */
+  max-height: 40vh; /* Lar den bygge seg nedover, men ikke lenger enn 40% av skjermen */
+  overflow-y: auto; /* Tillater at man scroller gjennom knappene om nødvendig */
 }
 #actions.hidden{ display:none; }
 .actionRow{
   display:flex;
   justify-content:space-around;
   gap:4px;
+  flex-shrink: 0;
 }
 .actionRow:first-child{
   padding-bottom:6px;
