@@ -506,8 +506,8 @@ function renderSlotPicker(allowCancel){
     card.addEventListener('click', ()=> chooseSlot(slotIndex));
     grid.appendChild(card);
   });
-  el.btnCloseSlots.classList.toggle('hidden', !allowCancel);
-  el.btnMeetup.classList.toggle('hidden', getHatchedSlots().length < 2);
+  el.btnCloseSlots.style.display = allowCancel ? '' : 'none';
+  el.btnMeetup.style.display = getHatchedSlots().length < 2 ? 'none' : '';
 }
 
 function getHatchedSlots(){ return SLOT_INDEXES.map(index=>({ index, raw: loadSlotRaw(index) })).filter(s=> s.raw && s.raw.phase==='pet'); }
@@ -1155,7 +1155,7 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR
     const bx = Math.sin(action.progress*Math.PI*12)*6;
     drawEmojiOverlay(ctx, '🪥', mouthX+bx, mouthY, 22, 1);
   }
-  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY, hs*0.8);
+  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY, hs*0.8); // Sentrert på reptilmunnen
   if(equipped && equipped.glasses) drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
   if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.55, headR*0.42, hs*0.55);
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-headR*1.6, headY+headR*0.3, hs*0.6);
@@ -1321,10 +1321,20 @@ function spawnBubbles(n=10){
 /* ---------- Screen switching ---------- */
 
 let lastNonSlotScreen = 'select';
+
+/* 
+  VIKTIG OPPDATERING: showScreen styrer nå "display"-stilen direkte! 
+  Dette betyr at selv om en annen CSS-regel er i konflikt, vil JavaScriptet
+  bestemme nøyaktig hvilke skjermer som er synlige og hvilke som er skjult.
+*/
 function showScreen(name){
   if(name !== 'slots' && name !== 'shop' && name !== 'meetup') lastNonSlotScreen = name;
-  Object.entries(el.screens).forEach(([k,node])=>{ node.classList.toggle('hidden', k!==name); });
+  Object.entries(el.screens).forEach(([k,node])=>{ 
+    node.classList.toggle('hidden', k!==name); 
+    node.style.display = (k === name) ? 'flex' : 'none';
+  });
   el.actions.classList.toggle('hidden', name!=='pet');
+  el.actions.style.display = (name === 'pet') ? 'flex' : 'none';
 }
 
 /* ---------- Stat update / decay ---------- */
