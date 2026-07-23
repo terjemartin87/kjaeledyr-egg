@@ -9,6 +9,10 @@ const SPECIES = {
   bunny:  { name:'Kanin',  body:'#f3e3ee', ear:'#f2a8cf', pattern:'#e084b8', eyeType:'round', emoji:'🐰' },
   snake:  { name:'Slange', body:'#8fbf6a', ear:'#5c8f3f', pattern:'#e0d060', eyeType:'round', emoji:'🐍', bodyPlan:'snake' },
   gecko:  { name:'Gekko',  body:'#f0c869', ear:'#c9a04a', pattern:'#5a3a2a', eyeType:'round', emoji:'🦎', bodyPlan:'gecko' },
+  lion:   { name:'Løve',   body:'#f1c40f', ear:'#e67e22', pattern:'#d35400', eyeType:'round', emoji:'🦁' },
+  monkey: { name:'Ape',    body:'#8d6e63', ear:'#f4b183', pattern:'#d7ccc8', eyeType:'round', emoji:'🐒' },
+  unicorn:{ name:'Enhjørning', body:'#f8f9fa', ear:'#ffb6c1', pattern:'#a29bfe', eyeType:'round', emoji:'🦄' },
+  pig:    { name:'Gris',   body:'#ffb8c6', ear:'#f48fb1', pattern:'#ff9eaf', eyeType:'round', emoji:'🐷' }
 };
 
 const SHOP_ITEMS = [
@@ -58,7 +62,10 @@ const SLOT_INDEXES = Array.from({length:SLOT_COUNT}, (_,i)=>i+1);
 const ACTIVE_SLOT_KEY = 'petgame_active_slot';
 const LEGACY_SAVE_KEY = 'petgame_save_v1';
 
-const FOOD_EMOJI = { cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗' };
+const FOOD_EMOJI = { 
+  cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗',
+  lion:'🥩', monkey:'🍌', unicorn:'🧁', pig:'🍎'
+};
 const FULL_HUNGER_THRESHOLD = 92;
 
 const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000, dino:5000, toilet:1600 };
@@ -742,12 +749,55 @@ function drawLimbs(ctx, speciesKey, sp, profile, bodyY) {
   });
 }
 
-function drawEars(ctx, speciesKey, sp, profile){
+function drawEars(ctx, speciesKey, sp, profile, stage){
   const r = profile.headR;
   const s = profile.earScale;
   ctx.fillStyle = sp.ear;
 
-  if (speciesKey === 'cat') {
+  if (speciesKey === 'lion') {
+    if (profile.features && (stage === 'teen' || stage === 'adult')) {
+      ctx.fillStyle = sp.pattern; // Løvemanke
+      ctx.beginPath(); ctx.arc(0, -r*0.1, r*1.6, 0, Math.PI*2); ctx.fill();
+      for(let i=0; i<12; i++){
+        ctx.save(); ctx.rotate((i/12)*Math.PI*2);
+        ctx.beginPath(); ctx.moveTo(r*1.4, 0); ctx.lineTo(r*2.1, r*0.4); ctx.lineTo(r*1.4, r*0.8); ctx.fill();
+        ctx.restore();
+      }
+    }
+    [-1, 1].forEach(dir => {
+      ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.6); ctx.scale(s, s);
+      ctx.beginPath(); ctx.arc(0,0, 10, 0, Math.PI*2); ctx.fillStyle=sp.body; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0, 5, 0, Math.PI*2); ctx.fillStyle=sp.ear; ctx.fill();
+      ctx.restore();
+    });
+  } else if (speciesKey === 'monkey') {
+    [-1, 1].forEach(dir => {
+      ctx.save(); ctx.translate(dir * r * 0.9, -r * 0.2); ctx.scale(s, s);
+      ctx.beginPath(); ctx.arc(0,0, 14, 0, Math.PI*2); ctx.fillStyle=sp.body; ctx.fill();
+      ctx.beginPath(); ctx.arc(dir*2,0, 8, 0, Math.PI*2); ctx.fillStyle=sp.ear; ctx.fill();
+      ctx.restore();
+    });
+  } else if (speciesKey === 'unicorn') {
+    [-1, 1].forEach(dir => {
+      ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.8); ctx.scale(s, s);
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(dir*10, -20, dir*4, -30); ctx.quadraticCurveTo(-dir*5, -15, -dir*10, 0); ctx.fillStyle=sp.body; ctx.fill();
+      ctx.restore();
+    });
+    if (profile.features) {
+      ctx.save(); ctx.translate(0, -r * 0.85); ctx.scale(s, s);
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -35); ctx.lineTo(6, 0); ctx.fillStyle=sp.pattern; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-4, -10); ctx.lineTo(4, -15); ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-3, -20); ctx.lineTo(3, -25); ctx.stroke();
+      ctx.restore();
+    }
+  } else if (speciesKey === 'pig') {
+    [-1, 1].forEach(dir => {
+      ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.6); ctx.scale(s, s);
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(dir*20, -10); ctx.lineTo(dir*10, 10); ctx.fillStyle=sp.body; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(dir*4,0); ctx.lineTo(dir*16, -6); ctx.lineTo(dir*8, 6); ctx.fillStyle=sp.ear; ctx.fill();
+      ctx.restore();
+    });
+  } else if (speciesKey === 'cat') {
     [-1, 1].forEach(dir => {
       ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.6); ctx.scale(s, s);
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 16, -30); ctx.lineTo(dir * -12, -14); ctx.closePath(); ctx.fill();
@@ -795,7 +845,28 @@ function drawTail(ctx, speciesKey, sp, profile, stage){
   const bx = profile.bodyRX, by = profile.bodyRY;
   const s = profile.tailScale;
   ctx.save();
-  if (speciesKey === 'dragon') {
+  if (speciesKey === 'lion') {
+    ctx.translate(bx * 0.85, by * 0.2); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(30, 10, 40, 30);
+    ctx.lineWidth = 8; ctx.strokeStyle = sp.body; ctx.lineCap = 'round'; ctx.stroke();
+    if (stage === 'teen' || stage === 'adult') {
+      ctx.beginPath(); ctx.arc(40, 32, 8, 0, Math.PI*2); ctx.fillStyle = sp.pattern; ctx.fill();
+    }
+  } else if (speciesKey === 'monkey') {
+    ctx.translate(bx * 0.85, by * 0.2); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(40, 20, 50, -10); ctx.quadraticCurveTo(60, -40, 40, -40); ctx.quadraticCurveTo(25, -40, 35, -20);
+    ctx.lineWidth = 10; ctx.strokeStyle = sp.body; ctx.lineCap = 'round'; ctx.stroke();
+  } else if (speciesKey === 'unicorn') {
+    ctx.translate(bx * 0.85, by * 0.1); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(30, -20, 25, 40);
+    ctx.lineWidth = 14; ctx.strokeStyle = sp.pattern; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5,0); ctx.quadraticCurveTo(40, -10, 35, 35);
+    ctx.lineWidth = 8; ctx.strokeStyle = '#ffb6c1'; ctx.lineCap = 'round'; ctx.stroke();
+  } else if (speciesKey === 'pig') {
+    ctx.translate(bx * 0.85, by * 0.1); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20, -20, 10, -30); ctx.quadraticCurveTo(-5, -40, 15, -45);
+    ctx.lineWidth = 6; ctx.strokeStyle = sp.body; ctx.lineCap = 'round'; ctx.stroke();
+  } else if (speciesKey === 'dragon') {
     ctx.translate(bx * 0.85, 0); ctx.scale(s, s);
     ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(40, -10, 45, -45);
     ctx.lineWidth = 16; ctx.strokeStyle = sp.body; ctx.lineCap = 'round'; ctx.stroke();
@@ -914,7 +985,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, 0, profile.bodyY - profile.bodyRY*0.6);
 
   // 4. Ører (Dynamisk festet til hodet)
-  drawEars(ctx, speciesKey, sp, profile);
+  drawEars(ctx, speciesKey, sp, profile, stage);
 
   // 5. Hode
   ctx.beginPath(); ctx.arc(0, 0, profile.headR, 0, Math.PI*2); ctx.fillStyle = sp.body; ctx.fill();
@@ -930,13 +1001,31 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*16,-2,10,12,dir*0.15,0,Math.PI*2); ctx.fill(); });
   }
 
-  // Snute
-  if((speciesKey==='fox' || speciesKey==='dog') && profile.features){
+  // Ape ansiktsmaske
+  if(speciesKey==='monkey' && profile.features){
+    ctx.fillStyle = sp.pattern;
+    ctx.beginPath(); ctx.ellipse(0, 0, profile.headR*0.85, profile.headR*0.75, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Grisetryne
+  if(speciesKey==='pig' && profile.features){
+    ctx.beginPath(); ctx.ellipse(0, 8, 16, 12, 0, 0, Math.PI*2); ctx.fillStyle = sp.ear; ctx.fill();
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath(); ctx.arc(-5, 6, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(5, 6, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Snute (Rev, Hund, Løve, Enhjørning)
+  if((speciesKey==='fox' || speciesKey==='dog' || speciesKey==='lion' || speciesKey==='unicorn') && profile.features){
     ctx.beginPath();
     const snoutW = stage === 'adult' ? 18 : (stage === 'teen' ? 16 : 14);
     const snoutH = stage === 'adult' ? 14 : 12;
     ctx.ellipse(0, 10, snoutW, snoutH, 0, 0, Math.PI*2);
-    ctx.fillStyle = speciesKey==='fox' ? '#fff8ee' : 'rgba(255,255,255,0.6)'; ctx.fill();
+    if(speciesKey==='fox') ctx.fillStyle = '#fff8ee';
+    else if(speciesKey==='lion') ctx.fillStyle = '#f39c12';
+    else if(speciesKey==='unicorn') ctx.fillStyle = '#f1f2f6';
+    else ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fill();
   }
 
   // Øyne
@@ -971,13 +1060,21 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if(pacifier){
     drawPacifier(ctx, 0, 13, 1.1); // Sentrert over munnen
   } else {
-    ctx.fillStyle='#3a2a20'; ctx.beginPath(); ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    // Hvis det ikke er en gris (grisen har en stor snute og trenger ikke den lille nesen)
+    if (speciesKey !== 'pig') {
+      ctx.fillStyle='#3a2a20'; ctx.beginPath(); ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
+    }
     ctx.strokeStyle='#3a2a20'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
-    if(asleep){ ctx.moveTo(-6,12); ctx.lineTo(6,12); }
-    else if(action && action.type==='eat' && chompProgress<1){ const mouthOpen = Math.abs(Math.sin(chompProgress*Math.PI*4))*8; ctx.moveTo(-9,10); ctx.quadraticCurveTo(0,14+mouthOpen,9,10); }
-    else if(annoyed){ ctx.moveTo(-9,16); ctx.quadraticCurveTo(0,8,9,16); }
-    else { ctx.moveTo(-9,10); ctx.quadraticCurveTo(0,20,9,10); }
+    
+    // Grisen har munnen litt lavere pga. snuten
+    const mY = (speciesKey === 'pig') ? 14 : 10;
+    
+    if(asleep){ ctx.moveTo(-6,mY+2); ctx.lineTo(6,mY+2); }
+    else if(action && action.type==='eat' && chompProgress<1){ const mouthOpen = Math.abs(Math.sin(chompProgress*Math.PI*4))*8; ctx.moveTo(-9,mY); ctx.quadraticCurveTo(0,mY+4+mouthOpen,9,mY); }
+    else if(annoyed){ ctx.moveTo(-9,mY+6); ctx.quadraticCurveTo(0,mY-2,9,mY+6); }
+    else { ctx.moveTo(-9,mY); ctx.quadraticCurveTo(0,mY+10,9,mY); }
     ctx.stroke();
+
     if(speciesKey==='bunny' && !annoyed && !asleep && profile.features){
       ctx.fillStyle='#fff'; ctx.fillRect(-4,13,3.5,6); ctx.fillRect(0.5,13,3.5,6);
       ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=0.5; ctx.strokeRect(-4,13,3.5,6); ctx.strokeRect(0.5,13,3.5,6);
@@ -1058,7 +1155,7 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR
     const bx = Math.sin(action.progress*Math.PI*12)*6;
     drawEmojiOverlay(ctx, '🪥', mouthX+bx, mouthY, 22, 1);
   }
-  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY, hs*0.8); // Sentrert på reptilmunnen
+  if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY, hs*0.8);
   if(equipped && equipped.glasses) drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
   if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.55, headR*0.42, hs*0.55);
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-headR*1.6, headY+headR*0.3, hs*0.6);
