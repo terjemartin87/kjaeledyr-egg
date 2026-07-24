@@ -153,11 +153,6 @@ const el = {
   skySunMoon: document.getElementById('skySunMoon'),
   skyClouds: document.getElementById('skyClouds'),
   skyRain: document.getElementById('skyRain'),
-  roomPlant: document.getElementById('roomPlant'),
-  roomPlant2: document.getElementById('roomPlant2'),
-  roomPoster: document.getElementById('roomPoster'),
-  roomLamp: document.getElementById('roomLamp'),
-  roomClock: document.getElementById('roomClock'),
   eggGrid: document.getElementById('eggGrid'),
   confirmSelect: document.getElementById('btn-confirmSelect'),
   canvasEgg: document.getElementById('canvas-egg'),
@@ -191,10 +186,36 @@ const el = {
   btnPlay: document.getElementById('btn-play'),
   btnWash: document.getElementById('btn-wash'),
   btnSleep: document.getElementById('btn-sleep'),
-  // Dynamiske knapper satt opp i init()
   btnPrestige: null,
   btnBreed: null
 };
+
+/* Sørg for at pyntegjenstandene faktisk eksisterer i HTML-en */
+function ensureRoomDecorExists() {
+  const roomBg = document.getElementById('roomBg');
+  if(!roomBg) return;
+  
+  const items = [
+    { id: 'roomPlant', class: 'roomDecor hidden', emoji: '🪴' },
+    { id: 'roomPlant2', class: 'roomDecor hidden', emoji: '🌵' },
+    { id: 'roomPoster', class: 'roomDecor hidden', emoji: '🖼️' },
+    { id: 'roomLamp', class: 'roomDecor hidden', emoji: '🪔' },
+    { id: 'roomClock', class: 'roomDecor hidden', emoji: '🕰️' }
+  ];
+
+  items.forEach(item => {
+    if(!document.getElementById(item.id)) {
+      const div = document.createElement('div');
+      div.id = item.id;
+      div.className = item.class;
+      div.textContent = item.emoji;
+      roomBg.appendChild(div);
+      el[item.id] = div;
+    } else {
+      el[item.id] = document.getElementById(item.id);
+    }
+  });
+}
 
 /* ---------- Persistence ---------- */
 
@@ -202,12 +223,12 @@ function defaultState(){
   return {
     phase:'select',
     species:null,
-    colors: null, // Kan overskrives via avl
+    colors: null,
     petName:null,
     hatched:false,
     birthTime:null,
     growthProgress:0,
-    prestige: 0, // Endgame nivå
+    prestige: 0,
     lastUpdate:Date.now(),
     sleeping:false,
     pacifier:false,
@@ -556,23 +577,18 @@ function doBreed(){
   saveState();
   refreshCoinUI();
 
-  // Velg de to første voksne som foreldre
   const p1 = adults[0].raw;
   const p2 = adults[1].raw;
   const c1 = p1.colors || SPECIES[p1.species];
   const c2 = p2.colors || SPECIES[p2.species];
 
-  // Arv art (50/50)
   const newSpecies = Math.random() > 0.5 ? p1.species : p2.species;
-
-  // Bland genetikk (farger)
   const newColors = {
     body: mixHex(c1.body, c2.body),
     ear: mixHex(c1.ear, c2.ear),
     pattern: mixHex(c1.pattern, c2.pattern)
   };
 
-  // Lagre nytt egg
   const newEgg = defaultState();
   newEgg.species = newSpecies;
   newEgg.colors = newColors;
@@ -591,7 +607,6 @@ function doMeetup(){
   const hatched = getHatchedSlots();
   if(hatched.length < 2) return;
 
-  // Gi alle som møtes en happiness-boost!
   hatched.forEach(({raw})=>{ raw.stats.happiness = Math.min(100, raw.stats.happiness+20); });
   hatched.forEach(({index, raw})=>{
     localStorage.setItem(SLOT_KEYS[index-1], JSON.stringify(raw));
@@ -603,7 +618,6 @@ function doMeetup(){
     ? `${names[0]} og ${names[1]} er glade for å se hverandre! 🎉`
     : `${names.slice(0,-1).join(', ')} og ${names[names.length-1]} har en fest sammen! 🎉`;
   
-  // Avl-knapp logikk
   const adults = hatched.filter(h => stageFromProgress(h.raw.growthProgress||0) === 'adult');
   const emptySlotIndex = SLOT_INDEXES.find(i => !loadSlotRaw(i));
   if(el.btnBreed) {
@@ -806,6 +820,22 @@ function drawAccessory(ctx, id, originX, originY, spread, scale=1){
       ctx.beginPath(); ctx.moveTo(-22,-18); ctx.lineTo(-22,-32); ctx.lineTo(-11,-22); ctx.lineTo(0,-36); ctx.lineTo(11,-22); ctx.lineTo(22,-32); ctx.lineTo(22,-18); ctx.closePath(); ctx.fill();
       ctx.fillStyle='#e0555f'; [-11,0,11].forEach(x=>{ ctx.beginPath(); ctx.arc(x, -24, 2.5, 0, Math.PI*2); ctx.fill(); });
       break;
+    case 'wizardhat':
+      ctx.fillStyle='#34495e';
+      ctx.beginPath(); ctx.ellipse(0, -14, 28, 6, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-18, -14); ctx.lineTo(0, -55); ctx.lineTo(18, -14); ctx.fill();
+      ctx.fillStyle='#f1c40f';
+      ctx.beginPath(); ctx.arc(0, -35, 4, 0, Math.PI*2); ctx.fill();
+      break;
+    case 'flowercrown':
+      ctx.strokeStyle='#2ecc71'; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.ellipse(0, -18, 22, 6, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#ff9ff3';
+      [-15, -8, 0, 8, 15].forEach((fx, i) => {
+        ctx.beginPath(); ctx.arc(fx, -18 + (i%2)*2, 4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = i%2===0 ? '#feca57' : '#ff9ff3';
+      });
+      break;
     case 'sunglasses':
       ctx.fillStyle='#1a1a1a'; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*eyeDX, 0, 9, 6.5, 0, 0, Math.PI*2); ctx.fill(); });
       ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(-eyeDX+8, 0); ctx.lineTo(eyeDX-8, 0); ctx.stroke();
@@ -813,6 +843,18 @@ function drawAccessory(ctx, id, originX, originY, spread, scale=1){
     case 'nerdglasses':
       ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=2.5; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*eyeDX, 0, 9, 0, Math.PI*2); ctx.stroke(); });
       ctx.beginPath(); ctx.moveTo(-eyeDX+9, 0); ctx.lineTo(eyeDX-9, 0); ctx.stroke();
+      break;
+    case 'heartglasses':
+      ctx.fillStyle='#ff4757';
+      [-1,1].forEach(dir=>{
+        ctx.save(); ctx.translate(dir*eyeDX, 0);
+        ctx.beginPath(); ctx.moveTo(0, 4);
+        ctx.bezierCurveTo(-10, -8, -12, -14, -6, -16); ctx.bezierCurveTo(0, -18, 0, -10, 0, -10);
+        ctx.bezierCurveTo(0, -10, 0, -18, 6, -16); ctx.bezierCurveTo(12, -14, 10, -8, 0, 4);
+        ctx.fill(); ctx.restore();
+      });
+      ctx.strokeStyle='#ff4757'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(-eyeDX+6, -10); ctx.lineTo(eyeDX-6, -10); ctx.stroke();
       break;
   }
   ctx.restore();
@@ -836,6 +878,11 @@ function drawNeckAccessory(ctx, id, originX=0, originY=0, scale=1){
       ctx.fillStyle='#ff8fb1';
       ctx.beginPath(); ctx.moveTo(-28,16); ctx.quadraticCurveTo(0,30,28,16); ctx.lineTo(24,26); ctx.quadraticCurveTo(0,38,-24,26); ctx.closePath(); ctx.fill();
       ctx.fillStyle='#e0555f'; [-12,0,12].forEach(x=>{ ctx.beginPath(); ctx.arc(x,26,2,0,Math.PI*2); ctx.fill(); });
+      break;
+    case 'necklace':
+      ctx.strokeStyle='#f1c40f'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.ellipse(0, 24, 14, 8, 0, 0, Math.PI); ctx.stroke();
+      ctx.fillStyle='#e74c3c'; ctx.beginPath(); ctx.arc(0, 32, 5, 0, Math.PI*2); ctx.fill();
       break;
   }
   ctx.restore();
@@ -1045,7 +1092,7 @@ function drawTail(ctx, speciesKey, colors, profile, stage){
 
 function drawCreature(ctx, speciesKey, stage, opts={}){
   const sp = SPECIES[speciesKey];
-  const colors = opts.colors || sp; // Bruker hybridfarger om de finnes
+  const colors = opts.colors || sp;
 
   if(sp.bodyPlan==='snake') return drawSnakeCreature(ctx, speciesKey, stage, opts);
   if(sp.bodyPlan==='gecko') return drawGeckoCreature(ctx, speciesKey, stage, opts);
@@ -1089,7 +1136,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   ctx.rotate(extraRotate);
   ctx.scale((baseScale/100)*extraScaleX*pulseScale*Math.cos(yaw), (baseScale/100)*extraScaleY*pulseScale);
 
-  // Prestige Aura (bak dyret)
+  // Prestige Aura
   if (opts.prestige > 0) {
     const auraR = profile.bodyRX * 2 + Math.sin(bounceTime * 5) * 10;
     const grad = ctx.createRadialGradient(0, profile.bodyY, auraR * 0.3, 0, profile.bodyY, auraR);
@@ -1102,7 +1149,6 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, profile.bodyY, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Sykkel (tegnes bak)
   if(action && action.type==='cycle'){
     const wheelRot = action.progress*Math.PI*10;
     ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 4;
@@ -1115,7 +1161,6 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     });
   }
 
-  // Dragevinger (bak kropp)
   if(speciesKey==='dragon' && profile.features){
     ctx.save(); ctx.translate(0, profile.bodyY); ctx.scale(profile.tailScale, profile.tailScale);
     [-1,1].forEach(dir=>{
@@ -1125,13 +1170,10 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.restore();
   }
 
-  // 1. Hale
   ctx.save(); ctx.translate(0, profile.bodyY); drawTail(ctx, speciesKey, colors, profile, stage); ctx.restore();
 
-  // 2. Armer og bein
   drawLimbs(ctx, speciesKey, colors, profile, profile.bodyY);
 
-  // 3. Kropp (Torso)
   ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2);
   ctx.fillStyle = (speciesKey === 'panda' || speciesKey === 'redpanda') ? '#2a2a2a' : colors.body; ctx.fill();
   
@@ -1143,7 +1185,6 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill();
   }
 
-  // Gepard kropps-prikker
   if(speciesKey === 'cheetah' && profile.features) {
     ctx.fillStyle = colors.pattern;
     [[-10,-10], [15,-5], [-12,5], [10,12], [0,-2]].forEach(([sx,sy]) => {
@@ -1151,19 +1192,16 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     });
   }
 
-  // Halsbånd/skjerf
   const equipped = opts.equipped;
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, 0, profile.bodyY - profile.bodyRY*0.6);
 
-  // 4. Ører
   drawEars(ctx, speciesKey, colors, profile, stage);
 
-  // 5. Hode
   ctx.beginPath(); ctx.arc(0, 0, profile.headR, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
 
   const eyeY = -4; const eyeDX = 16 * profile.eyeSpread; const eyeR = 6 * profile.eyeScale;
   const blink = (blinkPhase>0.92); 
-  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !closedEyes); // Prestige dyr er tøffe!
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !closedEyes);
   const faceShift = Math.sin(yaw)*6;
 
   ctx.save(); ctx.translate(faceShift, 0);
@@ -1216,7 +1254,6 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     });
   }
 
-  // Øyne
   if(closedEyes || blink){
     ctx.strokeStyle='#3a2a20'; ctx.lineWidth=3; ctx.lineCap='round';
     [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-8, eyeY); ctx.quadraticCurveTo(dir*eyeDX, eyeY+6, dir*eyeDX+8, eyeY); ctx.stroke(); });
@@ -1248,7 +1285,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   if(pacifier){
-    drawPacifier(ctx, 0, 13, 1.1);
+    drawPacifier(ctx, 0, 13, 1.1); 
   } else {
     if (speciesKey !== 'pig') {
       ctx.fillStyle='#3a2a20'; ctx.beginPath(); ctx.ellipse(0, 6, 3.5, 2.5, 0, 0, Math.PI*2); ctx.fill();
@@ -1271,7 +1308,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   ctx.fillStyle='rgba(255,120,140,0.35)'; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*24, 10, 6, 0, Math.PI*2); ctx.fill(); });
 
-  if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, 0, -profile.headR + 10, eyeDX, 1);
+  if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, 0, -profile.headR + 6, eyeDX, 1);
 
   if(action && action.type==='eat'){
     if(chompProgress<1){ const foodScale = 1-chompProgress*0.7; drawEmojiOverlay(ctx, FOOD_EMOJI[speciesKey] || '🍎', 30, 4, 30*foodScale, 1); }
@@ -1345,8 +1382,8 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR
   }
   if(opts.pacifier) drawPacifier(ctx, mouthX, mouthY + 4*hs*0.8, hs*0.8);
   if(equipped && equipped.glasses) drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
-  if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.55, headR*0.42, hs*0.55);
-  if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-headR*1.6, headY+headR*0.3, hs*0.6);
+  if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.9, headR*0.42, hs*0.55);
+  if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-15, headY+5, hs*0.6);
 }
 
 function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
@@ -1439,6 +1476,21 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
     ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
+  // --- Axolotl Akvarium Bakside ---
+  const isAxolotl = speciesKey === 'axolotl';
+  const tankX = -110, tankY = -45, tankW = 210, tankH = 90;
+  if(isAxolotl) {
+    ctx.save(); ctx.translate(0, -bounce);
+    ctx.fillStyle = 'rgba(100, 200, 255, 0.25)'; ctx.fillRect(tankX, tankY, tankW, tankH);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    for(let i=0; i<6; i++) {
+      const bx = tankX + 10 + i*35;
+      const by = tankY + tankH - ((bounceTime * 15 + i*20) % tankH);
+      ctx.beginPath(); ctx.arc(bx, by, 2+(i%2)*2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   drawTaperedPath(ctx, [ { x:-40, y:6, r:5 }, { x:-68, y:-2, r:9 }, { x:-92, y:4, r:6 } ], colors.body);
   [[-28,26,-1],[18,26,-1],[-28,-24,1],[18,-24,1]].forEach(([lx,ly])=>{
     ctx.beginPath(); ctx.ellipse(lx, ly, 10, 7, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
@@ -1490,6 +1542,18 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   else if(annoyed){ ctx.moveTo(mouthX-8,mouthY+3); ctx.quadraticCurveTo(mouthX,mouthY-3,mouthX+8,mouthY+1); }
   else { ctx.moveTo(mouthX-8,mouthY-1); ctx.quadraticCurveTo(mouthX,mouthY+4,mouthX+8,mouthY-1); }
   ctx.stroke();
+
+  // --- Axolotl Akvarium Front ---
+  if(isAxolotl) {
+    ctx.save(); ctx.translate(0, -bounce);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath(); ctx.moveTo(tankX, tankY); ctx.lineTo(tankX+50, tankY); ctx.lineTo(tankX, tankY+80); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tankX, tankY+10); ctx.lineTo(tankX+tankW, tankY+10); ctx.stroke();
+    ctx.strokeStyle = 'rgba(150,220,255,0.6)'; ctx.lineWidth = 5;
+    ctx.strokeRect(tankX, tankY, tankW, tankH);
+    ctx.restore();
+  }
 
   drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR, mouthX, mouthY);
   ctx.restore();
@@ -1564,7 +1628,6 @@ function clamp(v){ return Math.max(0, Math.min(100, v)); }
 function updateGrowth(hours){
   if(hours <= 0) return; let mult = 1;
   if(state.stats.happiness >= 90) mult = 1.4; else if(state.stats.happiness >= 70) mult = 1.15;
-  // Prestige dyr vokser ørlite raskere
   mult *= Math.pow(1.1, state.prestige || 0);
   state.growthProgress = (state.growthProgress||0) + hours*mult;
 }
@@ -1574,9 +1637,7 @@ function applyElapsed(){
   const now = Date.now(); const hours = (now - state.lastUpdate) / 3600000;
   if(hours <= 0) return;
 
-  // For hvert prestige-nivå reduseres stat-tapet!
   const prestigeDecayFactor = Math.pow(0.85, state.prestige || 0);
-
   const s = state.stats;
   if(state.sleeping){
     s.energy = clamp(s.energy + SLEEP_ENERGY_GAIN_PER_HOUR*hours);
@@ -1745,18 +1806,15 @@ function drawDinoBody(ctx, progress){
   const walk = Math.sin(progress*Math.PI*8);
   ctx.save(); ctx.translate(180, 265+Math.abs(walk)*3);
 
-  // dust puffs under feet
   ctx.strokeStyle='rgba(120,90,50,0.35)'; ctx.lineWidth=3; ctx.lineCap='round';
   for(let i=0;i<3;i++){
     const dx = -70+i*70; const wobble=(progress*260)%40;
     ctx.beginPath(); ctx.moveTo(dx-wobble, 58); ctx.lineTo(dx-14-wobble, 58); ctx.stroke();
   }
 
-  // tail
   ctx.fillStyle='#3f9d4a';
   ctx.beginPath(); ctx.moveTo(-70,10); ctx.quadraticCurveTo(-140,-6+walk*3,-165,-20+walk*4); ctx.quadraticCurveTo(-140,14,-70,34); ctx.closePath(); ctx.fill();
 
-  // back legs (walk cycle)
   [1,-1].forEach(side=>{
     ctx.save(); ctx.translate(30*side, 30); ctx.rotate(side*walk*0.25);
     ctx.fillStyle='#3a8f45'; ctx.beginPath(); ctx.moveTo(-14,0); ctx.lineTo(14,0); ctx.lineTo(10,45); ctx.lineTo(-10,45); ctx.closePath(); ctx.fill();
@@ -1764,25 +1822,21 @@ function drawDinoBody(ctx, progress){
     ctx.restore();
   });
 
-  // body
   ctx.fillStyle='#4caf50'; ctx.beginPath(); ctx.ellipse(0,0,78,44,0,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#eaf7e0'; ctx.beginPath(); ctx.ellipse(6,20,48,20,0,0,Math.PI*2); ctx.fill();
 
-  // back spikes/ridges
   ctx.fillStyle='#2f7a39';
   for(let i=0;i<5;i++){
     const sx=-60+i*30, sy=-32+Math.sin(i)*3;
     ctx.beginPath(); ctx.moveTo(sx-8,sy+8); ctx.lineTo(sx,sy-14); ctx.lineTo(sx+8,sy+8); ctx.closePath(); ctx.fill();
   }
 
-  // stubby arms
   [1,-1].forEach(side=>{
     ctx.save(); ctx.translate(46*side, 6); ctx.rotate(side*0.3);
     ctx.fillStyle='#3f9d4a'; ctx.beginPath(); ctx.ellipse(0,0,8,18,0,0,Math.PI*2); ctx.fill();
     ctx.restore();
   });
 
-  // head + jaw
   ctx.save(); ctx.translate(88,-16); ctx.rotate(walk*0.05);
   ctx.fillStyle='#4caf50'; ctx.beginPath(); ctx.ellipse(0,0,34,26,0,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#eaf7e0'; ctx.beginPath(); ctx.moveTo(-6,10); ctx.quadraticCurveTo(24,16,30,4+Math.abs(walk)*6); ctx.quadraticCurveTo(14,20,-6,20); ctx.closePath(); ctx.fill();
@@ -1879,7 +1933,6 @@ function tick(){
     el.btnSleep.querySelector('.icon').textContent = state.sleeping ? '☀️' : '💤';
     el.btnSleep.querySelector('.label').textContent = state.sleeping ? 'Våkne' : 'Sov';
     
-    // Gjem/vis actions avhengig av stadiet
     el.btnDrive.classList.toggle('hidden', stage !== 'adult');
     if (el.btnPrestige) el.btnPrestige.classList.toggle('hidden', stage !== 'adult');
 
@@ -1921,9 +1974,9 @@ function refreshRoomDecor(){
 /* ---------- Init ---------- */
 
 function init(){
+  ensureRoomDecorExists(); // Bygger automatisk pyntegjenstandene som manglet
   buildEggGrid(); setupPetDrag();
 
-  // Dynamisk legg til Prestige knapp
   if (!document.getElementById('btn-prestige')) {
     const pBtn = document.createElement('div');
     pBtn.id = 'btn-prestige';
@@ -1934,7 +1987,6 @@ function init(){
     pBtn.addEventListener('click', doPrestige);
   }
 
-  // Dynamisk legg til Avle-knapp i Meetup Skjermen
   if (!document.getElementById('btn-breed')) {
     const bBtn = document.createElement('button');
     bBtn.id = 'btn-breed';
@@ -1948,7 +2000,7 @@ function init(){
   el.confirmSelect.addEventListener('click', ()=>{
     if(!selectedSpecies) return;
     state.species = selectedSpecies; 
-    state.colors = null; // Tilbakestiller for standard dyr kjøpt fra start
+    state.colors = null;
     state.phase = 'egg'; 
     eggShakeCount = 0; saveState();
     showScreen('egg'); initEggScreen();
