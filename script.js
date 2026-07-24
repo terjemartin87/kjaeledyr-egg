@@ -25,24 +25,15 @@ const SPECIES = {
 };
 
 const SHOP_ITEMS = [
-  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, 
-  { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
-  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, 
-  { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
-  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, 
-  { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
-  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, 
-  { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
-  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, 
-  { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
-  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, 
-  { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
-  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, 
-  { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
-  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, 
-  { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
-  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, 
-  { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
+  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
+  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
+  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
+  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
+  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
+  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
+  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
+  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
+  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
 ];
 
 const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
@@ -76,6 +67,7 @@ const FOOD_EMOJI = {
 const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000, dino:5000, toilet:1600 };
 const PLAY_VARIANTS = [ {key:'bounce',emoji:'⚽'}, {key:'spin',emoji:'🌀'}, {key:'zoomies',emoji:'💨'}, {key:'wiggle',emoji:'🎉'}, {key:'peekaboo',emoji:'👀'}, {key:'backflip',emoji:'⭐'}, {key:'dance',emoji:'🎵'}, {key:'chase',emoji:'🌪️'}, {key:'wave',emoji:'👋'}, {key:'jump',emoji:'🪀'} ];
 const YAW_MAX = 1.1;
+const EGG_SHAKES_NEEDED = 4; // Raskere klekking
 
 /* ---------- Tjenester og Grunnfunksjoner ---------- */
 function mixHex(c1, c2) {
@@ -101,14 +93,13 @@ function displayName(s){
 }
 
 function migrateLegacySave(){ 
-  const legacy = localStorage.getItem(LEGACY_SAVE_KEY); 
-  if(legacy){ 
-    if(!localStorage.getItem(SLOT_KEYS[0])){ 
-      localStorage.setItem(SLOT_KEYS[0], legacy); 
-      localStorage.setItem(ACTIVE_SLOT_KEY, '1'); 
+  try {
+    const legacy = localStorage.getItem(LEGACY_SAVE_KEY); 
+    if(legacy){ 
+      if(!localStorage.getItem(SLOT_KEYS[0])){ localStorage.setItem(SLOT_KEYS[0], legacy); localStorage.setItem(ACTIVE_SLOT_KEY, '1'); } 
+      localStorage.removeItem(LEGACY_SAVE_KEY); 
     } 
-    localStorage.removeItem(LEGACY_SAVE_KEY); 
-  } 
+  } catch(e) {}
 }
 
 function loadSlotRaw(slotIndex){ 
@@ -127,36 +118,19 @@ function loadState(slot){
 
 function saveState(){ 
   if(!activeSlot || !state) return; 
-  localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state)); 
+  try { localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state)); } catch(e) {}
 }
 
-/* ---------- GLOBALE VARIABLER (Helt trygge) ---------- */
+/* ---------- GLOBALE VARIABLER ---------- */
 migrateLegacySave();
 
 let activeSlot = Number(localStorage.getItem(ACTIVE_SLOT_KEY)) || null;
 let state = activeSlot ? loadState(activeSlot) : defaultState();
-if (!state) state = defaultState(); 
+if (!state || typeof state !== 'object') state = defaultState(); 
 
-let audioCtx = null;
-let animFrame = 0;
-let eggShakeCount = 0;
-let eggWobble = 0;
-let selectedSpecies = null;
-let currentAction = null;
-let growthPulseUntil = 0;
-let petYaw = 0;
-let petYawTarget = 0;
-let isDraggingPet = false;
-let dragStartX = 0;
-let dragStartYaw = 0;
-let currentMeetupPets = [];
-let lastStageSeen = null;
-let blinkPhase = 0;
-let bounceTime = 0;
-let toastTimer = null;
-let lastEnvUpdate = 0;
-let lastNonSlotScreen = 'select';
-let wakeLock = null;
+let audioCtx = null, animFrame = 0, eggShakeCount = 0, eggWobble = 0, selectedSpecies = null;
+let currentAction = null, growthPulseUntil = 0, petYaw = 0, petYawTarget = 0, isDraggingPet = false, dragStartX = 0, dragStartYaw = 0, currentMeetupPets = [];
+let lastStageSeen = null, blinkPhase = 0, bounceTime = 0, toastTimer = null, lastEnvUpdate = 0, lastNonSlotScreen = 'select', wakeLock = null;
 
 /* ---------- DOM refs ---------- */
 const el = {
@@ -188,7 +162,13 @@ function ensureNewElementsExist() {
   const container = document.getElementById('stage') || document.body;
   if (container && !document.getElementById('screen-meetup-select')) {
     const div = document.createElement('div'); div.id = 'screen-meetup-select'; div.className = 'screen hidden';
-    div.innerHTML = `<h1>Velg hvem som skal leke!</h1><div class="subtitle">Nøyaktig 2 voksne kreves for å lage hybrid-egg.</div><div id="meetupSelectList" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:360px; max-height:50vh; overflow-y:auto; padding:10px;"></div><button id="btn-startMeetup" class="bigButton" style="margin-top:15px;">Start Lekestund 🎉</button><button id="btn-cancelMeetup" class="ghostButton" style="margin-top:10px;">Avbryt</button>`;
+    div.innerHTML = `
+      <h1 style="color:#333;">Velg hvem som skal leke!</h1>
+      <div class="subtitle" style="color:#555;">Nøyaktig 2 voksne for avling.</div>
+      <div id="meetupSelectList" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; width:100%; max-height:45vh; overflow-y:auto; padding:10px;"></div>
+      <button id="btn-startMeetup" class="bigButton" style="margin-top:15px; width:80%;">Start Lekestund 🎉</button>
+      <button id="btn-cancelMeetup" class="ghostButton" style="margin-top:10px;">Avbryt</button>
+    `;
     container.appendChild(div); el.screens.meetupSelect = div;
     document.getElementById('btn-startMeetup').addEventListener('click', startMeetupSession);
     document.getElementById('btn-cancelMeetup').addEventListener('click', () => { showScreen(lastNonSlotScreen); });
@@ -197,6 +177,16 @@ function ensureNewElementsExist() {
   const screenEgg = document.getElementById('screen-egg');
   if (screenEgg && !document.getElementById('eggTimerLabel')) {
     const lbl = document.createElement('div'); lbl.id = 'eggTimerLabel'; lbl.style.cssText = 'margin-top: 15px; font-weight: bold; font-size: 1.1rem; color: #ff477e;'; screenEgg.appendChild(lbl);
+  }
+
+  // Sikkerhets-injeksjon av CSS hvis den mangler
+  if (!document.getElementById('dynamic-meetup-css')) {
+    const style = document.createElement('style'); style.id = 'dynamic-meetup-css';
+    style.innerHTML = `
+      .meetup-pet-toggle { background: #fff; border: 3px solid transparent; border-radius: 14px; padding: 10px; cursor: pointer; opacity: 0.5; transition: all .2s ease; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px; color:#333; }
+      .meetup-pet-toggle.selected { border-color: #ff8fb1; opacity: 1; background: #ffe0f0; transform: translateY(-3px); box-shadow: 0 4px 10px rgba(255,143,177,.3); }
+    `;
+    document.head.appendChild(style);
   }
 }
 
@@ -256,15 +246,8 @@ function renamePet(){
   state.petName = input.trim().slice(0, 16) || null; saveState();
 }
 
-function earnCoins(n){ 
-  if(!state) state = defaultState(); 
-  state.coins = (state.coins||0) + n; 
-}
-
-function refreshCoinUI(){ 
-  const c = document.getElementById('coinCount'); 
-  if(c && state) c.textContent = state.coins||0; 
-}
+function earnCoins(n){ if(!state) state = defaultState(); state.coins = (state.coins||0) + n; }
+function refreshCoinUI(){ const c = document.getElementById('coinCount'); if(c && state) c.textContent = state.coins||0; }
 
 function renderShop(){
   if(!state) state = defaultState();
@@ -325,10 +308,7 @@ function renderSlotPicker(allowCancel){
         e.stopPropagation(); 
         if(confirm(`Slette Plass ${slotIndex}?`)){ 
           localStorage.removeItem(SLOT_KEYS[slotIndex-1]); 
-          if(slotIndex === activeSlot) {
-            state = defaultState();
-            activeSlot = null;
-          }
+          if(slotIndex === activeSlot) { state = defaultState(); activeSlot = null; }
           renderSlotPicker(allowCancel); 
         } 
       });
@@ -347,7 +327,7 @@ function openMeetupSelect() {
   const list = document.getElementById('meetupSelectList'); if(!list) return; list.innerHTML = '';
   hatched.forEach(({index, raw}) => {
     const btn = document.createElement('div'); btn.className = 'meetup-pet-toggle selected'; btn.dataset.index = index;
-    btn.innerHTML = `<div style="font-size:1.8rem;">${SPECIES[raw.species].emoji}</div><div style="font-size:0.7rem;">${displayName(raw)}</div>`;
+    btn.innerHTML = `<div style="font-size:1.8rem;">${SPECIES[raw.species].emoji}</div><div style="font-size:0.7rem; text-align:center;">${displayName(raw)}</div>`;
     btn.addEventListener('click', () => btn.classList.toggle('selected')); list.appendChild(btn);
   });
   showScreen('meetupSelect');
@@ -538,7 +518,7 @@ function drawAccessory(ctx, id, originX, originY, spread, scale=1){
   ctx.restore();
 }
 
-function drawNeckAccessory(ctx, id, originX, originY, scale=1){
+function drawNeckAccessory(ctx, id, originX=0, originY=0, scale=1){
   ctx.save(); ctx.translate(originX, originY); ctx.scale(scale, scale);
   switch(id){
     case 'bowtie': ctx.fillStyle='#e0555f'; ctx.beginPath(); ctx.moveTo(0,26); ctx.lineTo(-12,18); ctx.lineTo(-12,34); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(0,26); ctx.lineTo(12,18); ctx.lineTo(12,34); ctx.closePath(); ctx.fill(); ctx.fillStyle='#c73c3c'; ctx.beginPath(); ctx.arc(0,26,4,0,Math.PI*2); ctx.fill(); break;
@@ -587,7 +567,7 @@ function drawEars(ctx, speciesKey, colors, profile, stage){
   } else if (speciesKey === 'fennec') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.8, -r * 0.4); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 28, -50); ctx.lineTo(dir * -10, -20); ctx.closePath(); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.moveTo(dir * 2, -5); ctx.lineTo(dir * 22, -40); ctx.lineTo(dir * -4, -18); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
   } else if (speciesKey === 'redpanda') {
-    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.65); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 18, -25); ctx.lineTo(dir * -12, -10); ctx.closePath(); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.moveTo(dir * 4, -4); ctx.lineTo(dir * 14, -18); ctx.lineTo(dir * -6, -8); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.8, -r * 0.5); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0,0, 12, 0, Math.PI*2); ctx.fillStyle=colors.body; ctx.fill(); ctx.beginPath(); ctx.arc(0,0, 6, 0, Math.PI*2); ctx.fillStyle=colors.pattern; ctx.fill(); ctx.restore(); });
   } else if (speciesKey === 'unicorn') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.8); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(dir*10, -20, dir*4, -30); ctx.quadraticCurveTo(-dir*5, -15, -dir*10, 0); ctx.fillStyle=colors.body; ctx.fill(); ctx.restore(); });
     if (profile.features) { ctx.save(); ctx.translate(0, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -35); ctx.lineTo(6, 0); ctx.fillStyle=colors.pattern; ctx.fill(); ctx.beginPath(); ctx.moveTo(-4, -10); ctx.lineTo(4, -15); ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-3, -20); ctx.lineTo(3, -25); ctx.stroke(); ctx.restore(); }
@@ -683,10 +663,18 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   drawLimbs(ctx, baseSpecies, colors, profile, profile.bodyY, asleep);
 
-  ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2); ctx.fillStyle = (baseSpecies === 'panda' || baseSpecies === 'redpanda') ? '#2a2a2a' : colors.body; ctx.fill();
-  if(baseSpecies === 'panda' || baseSpecies === 'penguin' || baseSpecies === 'owl') { ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = colors.pattern; ctx.fill(); } 
-  else if (baseSpecies === 'turtle') { ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = '#e5d38a'; ctx.fill(); } 
-  else { ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill(); }
+  ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2); 
+  ctx.fillStyle = (baseSpecies === 'panda') ? colors.pattern : colors.body; ctx.fill();
+  
+  if(baseSpecies === 'panda') { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill(); 
+  } else if(baseSpecies === 'penguin' || baseSpecies === 'owl') { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = colors.pattern; ctx.fill(); 
+  } else if (baseSpecies === 'turtle') { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = '#e5d38a'; ctx.fill(); 
+  } else { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill(); 
+  }
 
   if(baseSpecies === 'cheetah' && profile.features) { ctx.fillStyle = colors.pattern; [[-10,-10], [15,-5], [-12,5], [10,12], [0,-2]].forEach(([sx,sy]) => { ctx.beginPath(); ctx.arc(sx, profile.bodyY + sy, 2.5, 0, Math.PI*2); ctx.fill(); }); }
 
@@ -798,7 +786,7 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
+    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,50,0,0)';
     if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
@@ -914,7 +902,6 @@ function showScreen(name){
   if(name !== 'slots' && name !== 'shop' && name !== 'meetup' && name !== 'meetupSelect') lastNonSlotScreen = name;
   Object.entries(el.screens).forEach(([k,node])=>{ 
     if(node) {
-      // Både klassetoggle og style.display for å være 100% sikker mot CSS-konflikter
       node.classList.toggle('hidden', k !== name);
       node.style.display = (k === name) ? 'flex' : 'none'; 
     }
@@ -1054,7 +1041,7 @@ function refreshSleepUI(){ const overlay = document.getElementById('sleepOverlay
 
 /* ---------- Main loop ---------- */
 function tick(){
-  if (!state) state = defaultState(); // Siste sikkerhetsnett i loopen
+  if (!state) state = defaultState(); 
   animFrame++; bounceTime += 0.03; blinkPhase = (blinkPhase+0.01) % 1;
   if(!isDraggingPet) petYawTarget *= 0.93; petYaw += (petYawTarget - petYaw) * 0.25;
 
@@ -1097,7 +1084,7 @@ function tick(){
       if (state.hatchReadyAt && Date.now() < state.hatchReadyAt) {
         const diff = state.hatchReadyAt - Date.now(); const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000);
         lbl.textContent = `Klekker om: ${h}t ${m}m`;
-      } else { lbl.textContent = 'Klar! Trykk for å klekke!'; }
+      } else { lbl.textContent = 'Klar! Rist (trykk) på egget for å klekke!'; }
     }
   }
 
@@ -1127,7 +1114,7 @@ function refreshRoomDecor(){
 
 /* ---------- Init ---------- */
 function init(){
-  if (!state) state = defaultState(); // Siste sikkerhetsnett før start
+  if (!state) state = defaultState(); 
   
   ensureNewElementsExist(); buildEggGrid(); setupPetDrag();
 
