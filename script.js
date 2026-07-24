@@ -73,7 +73,6 @@ const FOOD_EMOJI = {
   unicorn:'🧁', pig:'🍎', axolotl:'🦐', fennek:'🦂', cheetah:'🥩', lemur:'🍉', redpanda:'🍇', turtle:'🥬', penguin:'🐟', owl:'🐁', hybrid:'🌟'
 };
 
-const FULL_HUNGER_THRESHOLD = 92;
 const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000, dino:5000, toilet:1600 };
 const PLAY_VARIANTS = [ {key:'bounce',emoji:'⚽'}, {key:'spin',emoji:'🌀'}, {key:'zoomies',emoji:'💨'}, {key:'wiggle',emoji:'🎉'}, {key:'peekaboo',emoji:'👀'}, {key:'backflip',emoji:'⭐'}, {key:'dance',emoji:'🎵'}, {key:'chase',emoji:'🌪️'}, {key:'wave',emoji:'👋'}, {key:'jump',emoji:'🪀'} ];
 const YAW_MAX = 1.1;
@@ -405,6 +404,7 @@ function doBreed(){
 
 function renderMeetupCanvas() {
   const canvas = document.getElementById('canvas-meetup'); if(!canvas) return;
+  // Tving canvas til å alltid ha intern oppløsning for å unngå at tegningen "forsvinner"
   if(canvas.width !== 400) canvas.width = 400; 
   if(canvas.height !== 300) canvas.height = 300; 
   const ctx = canvas.getContext('2d'); ctx.clearRect(0,0, canvas.width, canvas.height);
@@ -702,7 +702,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   drawLimbs(ctx, baseSpecies, colors, profile, profile.bodyY, asleep);
 
-  // KROPP (Panda og Rød Panda fiks)
+  // Fikset farge for Panda/Rød Panda kropp
   ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2);
   ctx.fillStyle = (baseSpecies === 'panda') ? colors.pattern : colors.body; 
   ctx.fill();
@@ -1092,7 +1092,7 @@ function refreshSleepUI(){ const overlay = document.getElementById('sleepOverlay
 
 /* ---------- Main loop ---------- */
 function tick(){
-  if (!state) state = defaultState(); 
+  if (!state) state = defaultState();
   animFrame++; bounceTime += 0.03; blinkPhase = (blinkPhase+0.01) % 1;
   if(!isDraggingPet) petYawTarget *= 0.93; petYaw += (petYawTarget - petYaw) * 0.25;
 
@@ -1103,7 +1103,6 @@ function tick(){
 
     const canvas = document.getElementById('canvas-pet');
     if(canvas) {
-      // Sikrer at oppløsningen holdes korrekt
       if(canvas.width !== 360) canvas.width = 360; 
       if(canvas.height !== 360) canvas.height = 360;
       
@@ -1144,7 +1143,7 @@ function tick(){
   }
 
   const meetupScreen = document.getElementById('screen-meetup');
-  if (lastNonSlotScreen === 'meetup' && meetupScreen && meetupScreen.style.display !== 'none') { renderMeetupCanvas(); }
+  if (meetupScreen && !meetupScreen.classList.contains('hidden')) { renderMeetupCanvas(); }
   requestAnimationFrame(tick);
 }
 
