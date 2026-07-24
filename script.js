@@ -516,6 +516,7 @@ function doMeetup(){
   const hatched = getHatchedSlots();
   if(hatched.length < 2) return;
 
+  // Gi alle som møtes en happiness-boost!
   hatched.forEach(({raw})=>{ raw.stats.happiness = Math.min(100, raw.stats.happiness+20); });
   hatched.forEach(({index, raw})=>{
     localStorage.setItem(SLOT_KEYS[index-1], JSON.stringify(raw));
@@ -528,19 +529,54 @@ function doMeetup(){
     : `${names.slice(0,-1).join(', ')} og ${names[names.length-1]} har en fest sammen! 🎉`;
   showScreen('meetup'); SFX.hatch();
 
-  const ctx = el.canvasMeetup.getContext('2d');
-  ctx.clearRect(0,0,360,260);
-  const shown = hatched.slice(0, 4);
-  const n = shown.length;
-  const spacing = n<=2 ? 190 : (n===3 ? 140 : 100);
-  shown.forEach(({raw}, i)=>{
-    const x = (i - (n-1)/2) * spacing;
-    const yaw = x < -1 ? 0.3 : (x > 1 ? -0.3 : 0);
-    ctx.save(); ctx.translate(x, -70);
-    drawCreature(ctx, raw.species, stageFromProgress(raw.growthProgress||0), { sad:false, asleep:false, pacifier:false, action:null, yaw, equipped:raw.equipped });
+  const canvas = el.canvasMeetup;
+  // Setter en intern "tegnestørrelse" uavhengig av skjermstørrelse
+  canvas.width = 400;
+  canvas.height = 300;
+  canvas.style.aspectRatio = '4/3';
+  
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0, canvas.width, canvas.height);
+  
+  const n = hatched.length; 
+  
+  // Finn ut hvor mange kolonner og rader vi trenger (opptil 8 dyr totalt)
+  const maxCols = n <= 4 ? n : (n === 5 || n === 6 ? 3 : 4);
+  const numRows = Math.ceil(n / maxCols);
+  
+  // Skaler automatisk ned tegningene slik at alle får plass i rutenettet
+  const scale = n <= 2 ? 0.85 : (n <= 4 ? 0.6 : 0.45);
+  
+  const spacingX = 230;
+  const spacingY = 170;
+
+  ctx.save();
+  ctx.translate(200, 160); // Sentrerer origo midt i lerretet
+  ctx.scale(scale, scale);
+  
+  hatched.forEach(({raw}, i)=>{
+    const row = Math.floor(i / maxCols);
+    const col = i % maxCols;
+    const itemsInThisRow = row === numRows - 1 ? n - (row * maxCols) : maxCols;
+    
+    // Regn ut X- og Y-posisjon for dette dyret i rutenettet
+    const x = (col - (itemsInThisRow - 1) / 2) * spacingX;
+    const y = (row - (numRows - 1) / 2) * spacingY - 20; 
+    
+    // Få dem til å snu seg mot midten
+    const yaw = x < -20 ? 0.3 : (x > 20 ? -0.3 : 0);
+
+    ctx.save(); 
+    // Minus 180 fordi funksjonen drawCreature har sine egne standard-offsets bygget inn
+    ctx.translate(x - 180, y - 180); 
+    drawCreature(ctx, raw.species, stageFromProgress(raw.growthProgress||0), { 
+      sad:false, asleep:false, pacifier:false, action:null, yaw, equipped:raw.equipped 
+    });
     ctx.restore();
   });
-  drawEmojiOverlay(ctx, '💕', 180, 90, 30, 1);
+  ctx.restore();
+  
+  drawEmojiOverlay(ctx, '💕', 200, 45, 40, 1);
 }
 
 function chooseSlot(slotIndex){
@@ -1330,10 +1366,8 @@ let lastNonSlotScreen = 'select';
 function showScreen(name){
   if(name !== 'slots' && name !== 'shop' && name !== 'meetup') lastNonSlotScreen = name;
   Object.entries(el.screens).forEach(([k,node])=>{ 
-    node.classList.toggle('hidden', k!==name); 
     node.style.display = (k === name) ? 'flex' : 'none';
   });
-  el.actions.classList.toggle('hidden', name!=='pet');
   el.actions.style.display = (name === 'pet') ? 'flex' : 'none';
 }
 
