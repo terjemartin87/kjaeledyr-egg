@@ -58,6 +58,7 @@ const STAGE_PROFILE = {
 };
 
 const DECAY_PER_HOUR = { hunger:20, hygiene:10, happiness:6, energy:4 };
+const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
 const PACIFIER_HAPPINESS_PER_HOUR = 40;
 
@@ -92,8 +93,11 @@ function mixHex(c1, c2) {
 migrateLegacySave();
 let activeSlot = Number(localStorage.getItem(ACTIVE_SLOT_KEY)) || null;
 let state = activeSlot ? loadState() : defaultState();
+
+// Tids- og animasjonsvariabler samlet for sikkerhet
 let audioCtx = null, animFrame = 0, eggShakeCount = 0, eggWobble = 0, selectedSpecies = null;
 let currentAction = null, growthPulseUntil = 0, petYaw = 0, petYawTarget = 0, isDraggingPet = false, dragStartX = 0, dragStartYaw = 0, currentMeetupPets = [];
+let lastStageSeen = null, blinkPhase = 0, bounceTime = 0; // <-- Her er variablene som manglet!
 
 /* ---------- DOM refs ---------- */
 const el = {
@@ -141,7 +145,6 @@ function defaultState(){
   return { phase:'select', species:null, colors: null, hybridDNA: null, hatchReadyAt: null, petName:null, hatched:false, birthTime:null, growthProgress:0, prestige: 0, lastUpdate:Date.now(), sleeping:false, pacifier:false, muted:false, coins:0, inventory:[], equipped:{}, stats:{ hunger:100, energy:100, hygiene:100, happiness:100 } };
 }
 
-/* DENNE FUNKSJONEN MANGLER I FORRIGE VERSJON - FIKSER KRASJEN! */
 function displayName(s){ 
   if(!s) return '???';
   if(s.petName) return s.petName;
@@ -590,7 +593,8 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if (opts.prestige >= 1) {
     const auraR = profile.bodyRX * 2.2 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, profile.bodyY, auraR * 0.3, 0, profile.bodyY, auraR);
     let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; }
+    if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, profile.bodyY, auraR, 0, Math.PI * 2); ctx.fill();
   }
   if (opts.prestige >= 2 && !asleep) {
@@ -604,7 +608,6 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     [-30,30].forEach(wx=>{ ctx.save(); ctx.translate(wx, profile.bodyY+62); ctx.rotate(wheelRot); ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2); ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=3; ctx.stroke();
       for(let s=0;s<4;s++){ ctx.beginPath(); ctx.moveTo(-15,0); ctx.lineTo(15,0); ctx.stroke(); ctx.rotate(Math.PI/4); } ctx.restore(); });
   }
-
   if(baseSpecies==='dragon' && profile.features){
     ctx.save(); ctx.translate(0, profile.bodyY); ctx.scale(profile.tailScale, profile.tailScale);
     [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*20, -10); ctx.quadraticCurveTo(dir*90,-40,dir*70,20); ctx.quadraticCurveTo(dir*55,10,dir*20,-10); ctx.closePath(); ctx.fillStyle='rgba(127,216,160,0.55)'; ctx.fill(); ctx.strokeStyle='rgba(79,174,116,0.6)'; ctx.lineWidth=1.5; ctx.stroke(); }); ctx.restore();
@@ -624,11 +627,9 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if(baseSpecies === 'cheetah' && profile.features) { ctx.fillStyle = colors.pattern; [[-10,-10], [15,-5], [-12,5], [10,12], [0,-2]].forEach(([sx,sy]) => { ctx.beginPath(); ctx.arc(sx, profile.bodyY + sy, 2.5, 0, Math.PI*2); ctx.fill(); }); }
 
   const equipped = opts.equipped; if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, 0, profile.bodyY - profile.bodyRY*0.6);
-
   const turtleSleepShift = isTurtleAsleep ? 12 : 0; ctx.save(); ctx.translate(0, turtleSleepShift);
 
   const earSpecies = speciesKey === 'hybrid' && opts.hybridDNA ? opts.hybridDNA.ears : baseSpecies; drawEars(ctx, earSpecies, colors, profile, stage);
-
   ctx.beginPath(); ctx.arc(0, 0, profile.headR, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
 
   const eyeY = -4; const eyeDX = 16 * profile.eyeSpread; const eyeR = 6 * profile.eyeScale; const faceShift = Math.sin(yaw)*6;
@@ -724,16 +725,16 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
   const sp = SPECIES[baseSpecies] || SPECIES['snake']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
   const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
-  const annoyed = sad || (action && action.type==='refuse'); const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*3;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep); 
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*3;
 
   ctx.save(); ctx.translate(180+t.extraTX, 215+bounce+t.extraTY); 
   if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
   ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
   
-  if (opts.prestige >= 1) {
+  if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+    let a1, a2; if(opts.prestige === 1) { a1 = 'rgba(255,200,0,0.7)'; a2 = 'rgba(255,50,0,0)'; } else if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -766,20 +767,21 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
   const sp = SPECIES[baseSpecies] || SPECIES['gecko']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
   const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
-  const annoyed = sad || (action && action.type==='refuse'); const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*3;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep); 
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*3;
 
   ctx.save(); ctx.translate(180+t.extraTX, 210+bounce+t.extraTY);
   if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
   ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
   
-  if (opts.prestige >= 1) {
+  if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+    let a1, a2; if(opts.prestige === 1) { a1 = 'rgba(255,200,0,0.7)'; a2 = 'rgba(255,50,0,0)'; } else if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
-  const isAxolotl = baseSpecies === 'axolotl'; const tankX = -110, tankY = -45, tankW = 210, tankH = 90;
+  const isAxolotl = baseSpecies === 'axolotl' || (speciesKey==='hybrid' && opts.hybridDNA && opts.hybridDNA.base==='axolotl');
+  const tankX = -110, tankY = -45, tankW = 210, tankH = 90;
   if(isAxolotl) {
     ctx.save(); ctx.translate(0, -bounce); ctx.fillStyle = 'rgba(100, 200, 255, 0.25)'; ctx.fillRect(tankX, tankY, tankW, tankH); ctx.fillStyle = 'rgba(255,255,255,0.4)';
     for(let i=0; i<6; i++) { const bx = tankX + 10 + i*35; const by = tankY + tankH - ((bounceTime * 15 + i*20) % tankH); ctx.beginPath(); ctx.arc(bx, by, 2+(i%2)*2, 0, Math.PI*2); ctx.fill(); }
@@ -812,7 +814,6 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
       ctx.beginPath(); ctx.arc(headX+dir*eyeDX2-headR*0.14, eyeY2-headR*0.14, headR*0.09, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.fill();
     });
   }
-
   if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(headX+dir*eyeDX2-6, eyeY2-12); ctx.lineTo(headX+dir*eyeDX2+6, eyeY2-8); ctx.stroke(); }); }
 
   const mouthX = headX+18; const mouthY = headY+13;
@@ -847,8 +848,15 @@ function showScreen(name){
   const act = document.getElementById('actions'); if(act) act.style.display = (name === 'pet') ? 'flex' : 'none';
 }
 
+/* ---------- Stat update / decay ---------- */
 function clamp(v){ return Math.max(0, Math.min(100, v)); }
-function updateGrowth(hours){ if(hours <= 0) return; let mult = 1; if(state.stats.happiness >= 90) mult = 1.4; else if(state.stats.happiness >= 70) mult = 1.15; mult *= Math.pow(1.1, state.prestige || 0); state.growthProgress = (state.growthProgress||0) + hours*mult; }
+
+function updateGrowth(hours){
+  if(hours <= 0) return; let mult = 1;
+  if(state.stats.happiness >= 90) mult = 1.4; else if(state.stats.happiness >= 70) mult = 1.15;
+  mult *= Math.pow(1.1, state.prestige || 0);
+  state.growthProgress = (state.growthProgress||0) + hours*mult;
+}
 
 function applyElapsed(){
   if(state.phase !== 'pet') { state.lastUpdate = Date.now(); return; }
@@ -983,6 +991,7 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
+/* ---------- Age display & clock ---------- */
 function formatAge(hours){
   const totalMonths = hours/2; const years = Math.floor(totalMonths/12); const months = Math.floor(totalMonths%12);
   if(years > 0) return months>0 ? `${years} år ${months} mnd` : `${years} år`; if(months > 0) return `${months} mnd gammel`;
