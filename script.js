@@ -77,7 +77,6 @@ const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:120
 const PLAY_VARIANTS = [ {key:'bounce',emoji:'⚽'}, {key:'spin',emoji:'🌀'}, {key:'zoomies',emoji:'💨'}, {key:'wiggle',emoji:'🎉'}, {key:'peekaboo',emoji:'👀'}, {key:'backflip',emoji:'⭐'}, {key:'dance',emoji:'🎵'}, {key:'chase',emoji:'🌪️'}, {key:'wave',emoji:'👋'}, {key:'jump',emoji:'🪀'} ];
 const YAW_MAX = 1.1;
 
-
 /* ---------- Tjenester og Grunnfunksjoner ---------- */
 function mixHex(c1, c2) {
   if(!c1) c1 = '#ffffff'; if(!c2) c2 = '#ffffff';
@@ -101,18 +100,43 @@ function displayName(s){
   return '???'; 
 }
 
-function migrateLegacySave(){ const legacy = localStorage.getItem(LEGACY_SAVE_KEY); if(legacy){ if(!localStorage.getItem(SLOT_KEYS[0])){ localStorage.setItem(SLOT_KEYS[0], legacy); localStorage.setItem(ACTIVE_SLOT_KEY, '1'); } localStorage.removeItem(LEGACY_SAVE_KEY); } }
-function loadSlotRaw(slotIndex){ try{ const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } }
-function loadState(){ const parsed = loadSlotRaw(activeSlot); if(!parsed) return defaultState(); return Object.assign(defaultState(), parsed); }
-function saveState(){ if(!activeSlot || !state) return; localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state)); }
+function migrateLegacySave(){ 
+  const legacy = localStorage.getItem(LEGACY_SAVE_KEY); 
+  if(legacy){ 
+    if(!localStorage.getItem(SLOT_KEYS[0])){ 
+      localStorage.setItem(SLOT_KEYS[0], legacy); 
+      localStorage.setItem(ACTIVE_SLOT_KEY, '1'); 
+    } 
+    localStorage.removeItem(LEGACY_SAVE_KEY); 
+  } 
+}
 
+function loadSlotRaw(slotIndex){ 
+  if(!slotIndex) return null;
+  try{ 
+    const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]); 
+    return raw ? JSON.parse(raw) : null; 
+  }catch(e){ return null; } 
+}
 
-/* ---------- GLOBALE VARIABLER ---------- */
+function loadState(slot){ 
+  const parsed = loadSlotRaw(slot); 
+  if(!parsed) return defaultState(); 
+  return Object.assign(defaultState(), parsed); 
+}
+
+function saveState(){ 
+  if(!activeSlot || !state) return; 
+  localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state)); 
+}
+
+/* ---------- GLOBALE VARIABLER (Helt trygge) ---------- */
 migrateLegacySave();
 
 let activeSlot = Number(localStorage.getItem(ACTIVE_SLOT_KEY)) || null;
-let state = activeSlot ? loadState() : defaultState();
-if (!state) state = defaultState();
+// Her sikrer vi at state ALDRI kan bli null ved oppstart
+let state = activeSlot ? loadState(activeSlot) : defaultState();
+if (!state) state = defaultState(); 
 
 let audioCtx = null;
 let animFrame = 0;
@@ -233,11 +257,18 @@ function renamePet(){
   state.petName = input.trim().slice(0, 16) || null; saveState();
 }
 
-function earnCoins(n){ if(!state) state = defaultState(); state.coins = (state.coins||0) + n; }
-function refreshCoinUI(){ const c = document.getElementById('coinCount'); if(c && state) c.textContent = state.coins||0; }
+function earnCoins(n){ 
+  if(!state) state = defaultState(); 
+  state.coins = (state.coins||0) + n; 
+}
+
+function refreshCoinUI(){ 
+  const c = document.getElementById('coinCount'); 
+  if(c && state) c.textContent = state.coins||0; 
+}
 
 function renderShop(){
-  if(!state) return;
+  if(!state) state = defaultState();
   const sCoins = document.getElementById('shopCoins'); if(sCoins) sCoins.textContent = '🪙 ' + (state.coins||0);
   const grid = document.getElementById('shopGrid'); if(!grid) return; grid.innerHTML = '';
   SHOP_ITEMS.forEach(item=>{
@@ -246,7 +277,7 @@ function renderShop(){
     const priceLabel = owned ? (equipped ? 'På ✓' : 'Trykk for å ta på') : ('🪙 '+item.price);
     div.innerHTML = `<div class="shopIcon">${item.emoji}</div><div class="shopName">${item.name}</div><div class="shopPrice">${priceLabel}</div>`;
     div.addEventListener('click', ()=>{
-      if(!state) return;
+      if(!state) state = defaultState();
       if(!owned){
         if((state.coins||0) < item.price) return toast('Ikke nok mynter 🪙');
         state.coins -= item.price; state.inventory = state.inventory || []; state.inventory.push(item.id);
@@ -385,7 +416,7 @@ function renderMeetupCanvas() {
 
 function chooseSlot(slotIndex){
   activeSlot = slotIndex; localStorage.setItem(ACTIVE_SLOT_KEY, String(slotIndex));
-  state = loadState(); if(!state) state = defaultState();
+  state = loadState(activeSlot); if(!state) state = defaultState();
   eggShakeCount = 0; selectedSpecies = null; currentAction = null; lastStageSeen = null;
   document.querySelectorAll('.eggChoice').forEach(n=>n.classList.remove('selected'));
   const btnConf = document.getElementById('btn-confirmSelect'); if(btnConf) btnConf.disabled = true; applyElapsed();
@@ -436,7 +467,7 @@ function drawEggShape(ctx, patternColor, bodyColor, scale, wobble=0, isHybrid=fa
 }
 
 function initEggScreen(){
-  if(!state) return;
+  if(!state) state = defaultState();
   const canvas = document.getElementById('canvas-egg'); if(!canvas) return; const ctx = canvas.getContext('2d');
   function render(){
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.save(); ctx.translate(canvas.width/2, canvas.height/2+20);
@@ -450,7 +481,7 @@ function initEggScreen(){
     ctx.restore();
   }
   canvas.onclick = ()=>{
-    if(!state) return;
+    if(!state) state = defaultState();
     if(state.hatchReadyAt && Date.now() < state.hatchReadyAt) { SFX.refuse(); return toast("Magisk egg ruger fortsatt! ⏱️"); }
     eggShakeCount++; eggWobble = (Math.random()-0.5)*0.5; SFX.tap(); render(); setTimeout(()=>{ eggWobble=0; render(); },120);
     if(eggShakeCount >= EGG_SHAKES_NEEDED){ canvas.onclick = null; SFX.crack(); setTimeout(()=>{ SFX.hatch(); hatchEgg(); }, 350); }
@@ -459,7 +490,7 @@ function initEggScreen(){
 }
 
 function hatchEgg(){
-  if(!state) return;
+  if(!state) state = defaultState();
   state.hatched = true; state.phase = 'pet'; state.birthTime = Date.now(); state.growthProgress = 0; state.lastUpdate = Date.now();
   saveState(); showScreen('pet'); spawnSparkles(8); const n = SPECIES[state.species] ? SPECIES[state.species].name : 'Hybriden'; toast(`${n} har klekket! 🎉`);
 }
@@ -768,7 +799,8 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1, a2; if(opts.prestige === 1) { a1 = 'rgba(255,200,0,0.7)'; a2 = 'rgba(255,50,0,0)'; } else if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
+    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -810,8 +842,7 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
+    let a1, a2; if(opts.prestige === 1) { a1 = 'rgba(255,200,0,0.7)'; a2 = 'rgba(255,50,0,0)'; } else if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -1013,7 +1044,7 @@ function refreshSleepUI(){ const overlay = document.getElementById('sleepOverlay
 
 /* ---------- Main loop ---------- */
 function tick(){
-  if (!state) state = defaultState(); // Siste sikkerhetsnett i loopen
+  if (!state) state = defaultState();
   animFrame++; bounceTime += 0.03; blinkPhase = (blinkPhase+0.01) % 1;
   if(!isDraggingPet) petYawTarget *= 0.93; petYaw += (petYawTarget - petYaw) * 0.25;
 
@@ -1086,7 +1117,7 @@ function refreshRoomDecor(){
 
 /* ---------- Init ---------- */
 function init(){
-  if (!state) state = defaultState(); // Siste sikkerhetsnett før start
+  if (!state) state = defaultState(); 
   
   ensureNewElementsExist(); buildEggGrid(); setupPetDrag();
 
@@ -1131,12 +1162,15 @@ function init(){
   const bCoins = document.getElementById('btn-coins'); if(bCoins) bCoins.addEventListener('click', ()=>{ if(state && state.phase !== 'pet'){ return toast('Ingen kjæledyr å pynte ennå 🛍️'); } renderShop(); showScreen('shop'); });
   const bCloseShop = document.getElementById('btn-closeShop'); if(bCloseShop) bCloseShop.addEventListener('click', ()=> showScreen('pet') );
 
-  applyElapsed(); updateEnvironment(); updateClock();
-
-  if(!activeSlot){ renderSlotPicker(false); showScreen('slots'); }
-  else if(state.phase === 'pet' && state.species){ showScreen('pet'); lastStageSeen = getStage(); }
-  else if(state.phase === 'egg' && state.species){ showScreen('egg'); initEggScreen(); }
-  else showScreen('select');
+  if (state) {
+    applyElapsed(); updateEnvironment(); updateClock();
+    if(!activeSlot){ renderSlotPicker(false); showScreen('slots'); }
+    else if(state.phase === 'pet' && state.species){ showScreen('pet'); lastStageSeen = getStage(); }
+    else if(state.phase === 'egg' && state.species){ showScreen('egg'); initEggScreen(); }
+    else showScreen('select');
+  } else {
+    renderSlotPicker(false); showScreen('slots');
+  }
 
   requestAnimationFrame(tick);
 }
