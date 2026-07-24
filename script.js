@@ -134,7 +134,6 @@ function saveState(){
 migrateLegacySave();
 
 let activeSlot = Number(localStorage.getItem(ACTIVE_SLOT_KEY)) || null;
-// Her sikrer vi at state ALDRI kan bli null ved oppstart
 let state = activeSlot ? loadState(activeSlot) : defaultState();
 if (!state) state = defaultState(); 
 
@@ -186,11 +185,11 @@ function ensureNewElementsExist() {
     });
   }
 
-  const stage = document.getElementById('stage');
-  if (stage && !document.getElementById('screen-meetup-select')) {
+  const container = document.getElementById('stage') || document.body;
+  if (container && !document.getElementById('screen-meetup-select')) {
     const div = document.createElement('div'); div.id = 'screen-meetup-select'; div.className = 'screen hidden';
     div.innerHTML = `<h1>Velg hvem som skal leke!</h1><div class="subtitle">Nøyaktig 2 voksne kreves for å lage hybrid-egg.</div><div id="meetupSelectList" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:360px; max-height:50vh; overflow-y:auto; padding:10px;"></div><button id="btn-startMeetup" class="bigButton" style="margin-top:15px;">Start Lekestund 🎉</button><button id="btn-cancelMeetup" class="ghostButton" style="margin-top:10px;">Avbryt</button>`;
-    stage.appendChild(div); el.screens.meetupSelect = div;
+    container.appendChild(div); el.screens.meetupSelect = div;
     document.getElementById('btn-startMeetup').addEventListener('click', startMeetupSession);
     document.getElementById('btn-cancelMeetup').addEventListener('click', () => { showScreen(lastNonSlotScreen); });
   }
@@ -539,7 +538,7 @@ function drawAccessory(ctx, id, originX, originY, spread, scale=1){
   ctx.restore();
 }
 
-function drawNeckAccessory(ctx, id, originX=0, originY=0, scale=1){
+function drawNeckAccessory(ctx, id, originX, originY, scale=1){
   ctx.save(); ctx.translate(originX, originY); ctx.scale(scale, scale);
   switch(id){
     case 'bowtie': ctx.fillStyle='#e0555f'; ctx.beginPath(); ctx.moveTo(0,26); ctx.lineTo(-12,18); ctx.lineTo(-12,34); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(0,26); ctx.lineTo(12,18); ctx.lineTo(12,34); ctx.closePath(); ctx.fill(); ctx.fillStyle='#c73c3c'; ctx.beginPath(); ctx.arc(0,26,4,0,Math.PI*2); ctx.fill(); break;
@@ -842,7 +841,8 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1, a2; if(opts.prestige === 1) { a1 = 'rgba(255,200,0,0.7)'; a2 = 'rgba(255,50,0,0)'; } else if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
+    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -912,8 +912,18 @@ function spawnBubbles(n=10){ const layer = document.getElementById('bubbleLayer'
 
 function showScreen(name){
   if(name !== 'slots' && name !== 'shop' && name !== 'meetup' && name !== 'meetupSelect') lastNonSlotScreen = name;
-  Object.entries(el.screens).forEach(([k,node])=>{ if(node) node.style.display = (k === name) ? 'flex' : 'none'; });
-  const act = document.getElementById('actions'); if(act) act.style.display = (name === 'pet') ? 'flex' : 'none';
+  Object.entries(el.screens).forEach(([k,node])=>{ 
+    if(node) {
+      // Både klassetoggle og style.display for å være 100% sikker mot CSS-konflikter
+      node.classList.toggle('hidden', k !== name);
+      node.style.display = (k === name) ? 'flex' : 'none'; 
+    }
+  });
+  const act = document.getElementById('actions'); 
+  if(act) {
+    act.classList.toggle('hidden', name !== 'pet');
+    act.style.display = (name === 'pet') ? 'flex' : 'none';
+  }
 }
 
 /* ---------- Stat update / decay ---------- */
@@ -1044,7 +1054,7 @@ function refreshSleepUI(){ const overlay = document.getElementById('sleepOverlay
 
 /* ---------- Main loop ---------- */
 function tick(){
-  if (!state) state = defaultState();
+  if (!state) state = defaultState(); // Siste sikkerhetsnett i loopen
   animFrame++; bounceTime += 0.03; blinkPhase = (blinkPhase+0.01) % 1;
   if(!isDraggingPet) petYawTarget *= 0.93; petYaw += (petYawTarget - petYaw) * 0.25;
 
@@ -1117,7 +1127,7 @@ function refreshRoomDecor(){
 
 /* ---------- Init ---------- */
 function init(){
-  if (!state) state = defaultState(); 
+  if (!state) state = defaultState(); // Siste sikkerhetsnett før start
   
   ensureNewElementsExist(); buildEggGrid(); setupPetDrag();
 
