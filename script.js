@@ -25,15 +25,24 @@ const SPECIES = {
 };
 
 const SHOP_ITEMS = [
-  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
-  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
-  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
-  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
-  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
-  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
-  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
-  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
-  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
+  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, 
+  { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
+  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, 
+  { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
+  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, 
+  { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
+  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, 
+  { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
+  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, 
+  { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
+  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, 
+  { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
+  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, 
+  { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
+  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, 
+  { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
+  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, 
+  { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
 ];
 
 const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
@@ -65,6 +74,7 @@ const FOOD_EMOJI = {
   unicorn:'🧁', pig:'🍎', axolotl:'🦐', fennek:'🦂', cheetah:'🥩', lemur:'🍉', redpanda:'🍇', turtle:'🥬', penguin:'🐟', owl:'🐁', hybrid:'🌟'
 };
 
+const FULL_HUNGER_THRESHOLD = 92;
 const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000, dino:5000, toilet:1600 };
 const PLAY_VARIANTS = [ {key:'bounce',emoji:'⚽'}, {key:'spin',emoji:'🌀'}, {key:'zoomies',emoji:'💨'}, {key:'wiggle',emoji:'🎉'}, {key:'peekaboo',emoji:'👀'}, {key:'backflip',emoji:'⭐'}, {key:'dance',emoji:'🎵'}, {key:'chase',emoji:'🌪️'}, {key:'wave',emoji:'👋'}, {key:'jump',emoji:'🪀'} ];
 const YAW_MAX = 1.1;
@@ -1152,12 +1162,8 @@ function tick(){
     }
   }
 
-  // Fikset sjekk av meetupScreen - Nå fungerer renderMeetupCanvas perfekt!
   const meetupScreen = document.getElementById('screen-meetup');
-  if (meetupScreen && !meetupScreen.classList.contains('hidden')) { 
-      renderMeetupCanvas(); 
-  }
-  
+  if (meetupScreen && !meetupScreen.classList.contains('hidden')) { renderMeetupCanvas(); }
   requestAnimationFrame(tick);
 }
 
