@@ -25,24 +25,15 @@ const SPECIES = {
 };
 
 const SHOP_ITEMS = [
-  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, 
-  { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
-  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, 
-  { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
-  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, 
-  { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
-  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, 
-  { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
-  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, 
-  { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
-  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, 
-  { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
-  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, 
-  { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
-  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, 
-  { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
-  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, 
-  { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
+  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
+  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
+  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
+  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
+  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
+  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
+  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
+  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
+  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
 ];
 
 const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
@@ -67,6 +58,7 @@ const SLOT_KEYS = Array.from({length:SLOT_COUNT}, (_,i)=>`petgame_save_slot${i+1
 const SLOT_INDEXES = Array.from({length:SLOT_COUNT}, (_,i)=>i+1);
 const ACTIVE_SLOT_KEY = 'petgame_active_slot';
 const LEGACY_SAVE_KEY = 'petgame_save_v1';
+const GLOBAL_COINS_KEY = 'petgame_global_coins';
 
 const FOOD_EMOJI = { 
   cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗', lion:'🥩', monkey:'🍌', 
@@ -79,6 +71,9 @@ const YAW_MAX = 1.1;
 const EGG_SHAKES_NEEDED = 4;
 
 /* ---------- Tjenester og Grunnfunksjoner ---------- */
+function getGlobalCoins() { return parseInt(localStorage.getItem(GLOBAL_COINS_KEY)) || 0; }
+function addGlobalCoins(n) { const c = Math.max(0, getGlobalCoins() + n); localStorage.setItem(GLOBAL_COINS_KEY, c); return c; }
+
 function mixHex(c1, c2) {
   if(!c1) c1 = '#ffffff'; if(!c2) c2 = '#ffffff';
   const hex2rgb = hex => {
@@ -91,7 +86,7 @@ function mixHex(c1, c2) {
 }
 
 function defaultState(){
-  return { phase:'select', species:null, colors: null, hybridDNA: null, hatchReadyAt: null, petName:null, hatched:false, birthTime:null, growthProgress:0, prestige: 0, lastUpdate:Date.now(), sleeping:false, pacifier:false, muted:false, coins:0, inventory:[], equipped:{}, stats:{ hunger:100, energy:100, hygiene:100, happiness:100 } };
+  return { phase:'select', species:null, colors: null, hybridDNA: null, hatchReadyAt: null, petName:null, hatched:false, birthTime:null, growthProgress:0, prestige: 0, lastUpdate:Date.now(), sleeping:false, pacifier:false, muted:false, inventory:[], equipped:{}, stats:{ hunger:100, energy:100, hygiene:100, happiness:100 } };
 }
 
 function displayName(s){ 
@@ -185,7 +180,6 @@ function ensureNewElementsExist() {
     const lbl = document.createElement('div'); lbl.id = 'eggTimerLabel'; lbl.style.cssText = 'margin-top: 15px; font-weight: bold; font-size: 1.1rem; color: #ff477e;'; screenEgg.appendChild(lbl);
   }
 
-  // Sikkerhets-injeksjon av CSS hvis den mangler
   if (!document.getElementById('dynamic-meetup-css')) {
     const style = document.createElement('style'); style.id = 'dynamic-meetup-css';
     style.innerHTML = `
@@ -252,20 +246,16 @@ function renamePet(){
   state.petName = input.trim().slice(0, 16) || null; saveState();
 }
 
-function earnCoins(n){ 
-  if(!state) state = defaultState(); 
-  state.coins = (state.coins||0) + n; 
-}
-
+function earnCoins(n){ addGlobalCoins(n); }
 function refreshCoinUI(){ 
-  const c = document.getElementById('coinCount'); 
-  if(c && state) c.textContent = state.coins||0; 
+  const c = document.getElementById('coinCount'); if(c) c.textContent = getGlobalCoins(); 
+  const sc = document.getElementById('shopCoins'); if(sc) sc.textContent = '🪙 ' + getGlobalCoins();
 }
 
 function renderShop(){
   if(!state) state = defaultState();
-  const sCoins = document.getElementById('shopCoins'); if(sCoins) sCoins.textContent = '🪙 ' + (state.coins||0);
   const grid = document.getElementById('shopGrid'); if(!grid) return; grid.innerHTML = '';
+  refreshCoinUI();
   SHOP_ITEMS.forEach(item=>{
     const owned = (state.inventory||[]).includes(item.id); const equipped = state.equipped && state.equipped[item.slot] === item.id;
     const div = document.createElement('div'); div.className = 'shopItem' + (owned?' owned':'') + (equipped?' equipped':'');
@@ -274,8 +264,8 @@ function renderShop(){
     div.addEventListener('click', ()=>{
       if(!state) state = defaultState();
       if(!owned){
-        if((state.coins||0) < item.price) return toast('Ikke nok mynter 🪙');
-        state.coins -= item.price; state.inventory = state.inventory || []; state.inventory.push(item.id);
+        if(getGlobalCoins() < item.price) return toast('Ikke nok mynter 🪙');
+        addGlobalCoins(-item.price); state.inventory = state.inventory || []; state.inventory.push(item.id);
         state.equipped = state.equipped || {}; state.equipped[item.slot] = item.id; SFX.tap(); toast(`Kjøpte ${item.name}! 🎉`);
       } else { state.equipped = state.equipped || {}; state.equipped[item.slot] = equipped ? null : item.id; SFX.tap(); }
       saveState(); renderShop();
@@ -343,7 +333,7 @@ function openMeetupSelect() {
   const list = document.getElementById('meetupSelectList'); if(!list) return; list.innerHTML = '';
   hatched.forEach(({index, raw}) => {
     const btn = document.createElement('div'); 
-    btn.className = 'meetup-pet-toggle'; 
+    btn.className = 'meetup-pet-toggle'; // Starter uvalgt!
     btn.dataset.index = index;
     const sp = SPECIES[raw.species] || SPECIES['cat']; 
     btn.innerHTML = `<div style="font-size:1.8rem;">${sp.emoji}</div><div style="font-size:0.7rem; text-align:center;">${displayName(raw)}</div>`;
@@ -371,22 +361,31 @@ function startMeetupSession() {
   const bBreed = document.getElementById('btn-breed');
   
   if(bBreed) { 
-    const kanAvle = (adults.length === 2 && currentMeetupPets.length === 2 && emptySlotIndex);
-    bBreed.classList.toggle('hidden', !kanAvle); 
-    bBreed.style.display = kanAvle ? 'block' : 'none'; 
+    // Sørger for at knappen gjemmer seg totalt hvis kravene ikke er møtt
+    if(adults.length === 2 && currentMeetupPets.length === 2 && emptySlotIndex) {
+      bBreed.classList.remove('hidden'); 
+      bBreed.style.display = 'block'; 
+    } else {
+      bBreed.classList.add('hidden'); 
+      bBreed.style.display = 'none'; 
+    }
   }
   
   showScreen('meetup'); SFX.hatch();
 }
 
 function doBreed(){
-  if(currentMeetupPets.length !== 2) return toast('Kun 2 voksne dyr for avling! 🧬');
-  if(stageFromProgress(currentMeetupPets[0].raw.growthProgress||0) !== 'adult' || stageFromProgress(currentMeetupPets[1].raw.growthProgress||0) !== 'adult') return toast('Begge må være voksne! 🧬');
-  const emptySlotIndex = SLOT_INDEXES.find(i => !loadSlotRaw(i)); if(!emptySlotIndex) return toast('Ingen ledige plasser! 🥚');
-  if(!state || (state.coins||0) < 100) return toast('Koster 100 mynter! 🪙');
-  state.coins -= 100; saveState(); refreshCoinUI();
-
+  if(currentMeetupPets.length !== 2) return toast('Må være eksakt 2 dyr for avling! 🧬');
   const p1 = currentMeetupPets[0].raw, p2 = currentMeetupPets[1].raw;
+  if(stageFromProgress(p1.growthProgress||0) !== 'adult' || stageFromProgress(p2.growthProgress||0) !== 'adult') {
+    return toast('Begge dyrene må være voksne for å avle! 🧬');
+  }
+  
+  const emptySlotIndex = SLOT_INDEXES.find(i => !loadSlotRaw(i)); if(!emptySlotIndex) return toast('Ingen ledige plasser! 🥚');
+  if(getGlobalCoins() < 100) return toast('Koster 100 mynter! 🪙');
+  
+  addGlobalCoins(-100); refreshCoinUI();
+
   const c1 = p1.colors || SPECIES[p1.species] || SPECIES['cat'], c2 = p2.colors || SPECIES[p2.species] || SPECIES['cat'];
   const newColors = { body: mixHex(c1.body, c2.body), ear: mixHex(c1.ear, c2.ear), pattern: mixHex(c1.pattern, c2.pattern) };
   const hybridDNA = {
@@ -404,7 +403,6 @@ function doBreed(){
 
 function renderMeetupCanvas() {
   const canvas = document.getElementById('canvas-meetup'); if(!canvas) return;
-  // Tving canvas til å alltid ha intern oppløsning for å unngå at tegningen "forsvinner"
   if(canvas.width !== 400) canvas.width = 400; 
   if(canvas.height !== 300) canvas.height = 300; 
   const ctx = canvas.getContext('2d'); ctx.clearRect(0,0, canvas.width, canvas.height);
@@ -413,15 +411,26 @@ function renderMeetupCanvas() {
   let maxCols = 4; if (n > 12) maxCols = 5; else if (n <= 4) maxCols = n; else if (n === 5 || n === 6) maxCols = 3;
   const numRows = Math.ceil(n / maxCols);
   let scale = 0.85; if (n > 2) scale = 0.6; if (n > 4) scale = 0.45; if (n > 8) scale = 0.35; if (n > 12) scale = 0.25; if (n > 16) scale = 0.22;
-  const spacingX = 230, spacingY = 170;
+  const spacingX = 140 * scale + 40, spacingY = 140 * scale + 40; // Tilpasset sentrering
 
-  ctx.save(); ctx.translate(200, 160); ctx.scale(scale, scale);
+  ctx.save();
   currentMeetupPets.forEach(({raw}, i)=>{
     const row = Math.floor(i / maxCols), col = i % maxCols;
     const itemsInThisRow = row === numRows - 1 ? n - (row * maxCols) : maxCols;
-    const x = (col - (itemsInThisRow - 1) / 2) * spacingX; const y = (row - (numRows - 1) / 2) * spacingY - 20; 
-    const bounce = Math.abs(Math.sin(bounceTime * 3 + i)) * 15; const yaw = x < -20 ? 0.3 : (x > 20 ? -0.3 : 0);
-    ctx.save(); ctx.translate(x - 180, y - 180 - bounce); 
+    const offsetX = (col - (itemsInThisRow - 1) / 2) * spacingX; 
+    const offsetY = (row - (numRows - 1) / 2) * spacingY; 
+    
+    // Senter av canvas er (200, 150) pluss grid-offset
+    const posX = 200 + offsetX;
+    const posY = 160 + offsetY; 
+
+    const bounce = Math.abs(Math.sin(bounceTime * 3 + i)) * 15; 
+    const yaw = offsetX < -20 ? 0.3 : (offsetX > 20 ? -0.3 : 0);
+    
+    ctx.save(); 
+    ctx.translate(posX, posY - bounce); 
+    ctx.scale(scale, scale);
+    ctx.translate(-180, -180); // Fikser problemet med avstands-scalingen!
     drawCreature(ctx, raw.species, stageFromProgress(raw.growthProgress||0), { sad:false, asleep:false, pacifier:false, action:null, yaw, equipped:raw.equipped, prestige:raw.prestige||0, colors:raw.colors, hybridDNA: raw.hybridDNA });
     ctx.restore();
   });
@@ -702,7 +711,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   drawLimbs(ctx, baseSpecies, colors, profile, profile.bodyY, asleep);
 
-  // Fikset farge for Panda/Rød Panda kropp
+  // KROPP (Panda og Rød Panda fiks)
   ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2);
   ctx.fillStyle = (baseSpecies === 'panda') ? colors.pattern : colors.body; 
   ctx.fill();
@@ -743,6 +752,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if(baseSpecies==='owl' && profile.features && !closedEyes) { ctx.fillStyle = colors.pattern; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*eyeDX, eyeY, eyeR*2.5, 0, Math.PI*2); ctx.fill(); }); }
   if(baseSpecies==='pig' && profile.features){ ctx.beginPath(); ctx.ellipse(0, 8, 16, 12, 0, 0, Math.PI*2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(-5, 6, 2.5, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(5, 6, 2.5, 0, Math.PI*2); ctx.fill(); }
   
+  // FJernet redpanda fra revesnute
   if(['fox', 'dog', 'lion', 'unicorn', 'fennec', 'cheetah'].includes(baseSpecies) && profile.features){
     ctx.beginPath(); const snoutW = stage === 'adult' ? 18 : (stage === 'teen' ? 16 : 14); const snoutH = stage === 'adult' ? 14 : 12; ctx.ellipse(0, 10, snoutW, snoutH, 0, 0, Math.PI*2);
     if(baseSpecies==='fox') ctx.fillStyle = '#fff8ee'; else if(baseSpecies==='lion' || baseSpecies==='cheetah') ctx.fillStyle = '#f39c12'; else if(baseSpecies==='unicorn') ctx.fillStyle = '#f1f2f6'; else ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill();
@@ -1014,8 +1024,8 @@ function isNeedy(){ if(!state) return false; const s = state.stats; return s.hun
 /* ---------- Actions ---------- */
 function doPrestige(){
   if(!state) return;
-  if(state.sleeping) return toast('Zzz... sover nå 💤'); if(getStage() !== 'adult') return toast('Kjæledyret må være fullvoksent først! 🚫'); if((state.coins||0) < 100) return toast('Det koster 100 mynter! 🪙');
-  state.coins -= 100; state.prestige = (state.prestige || 0) + 1; state.stats.hunger = 100; state.stats.energy = 100; state.stats.hygiene = 100; state.stats.happiness = 100;
+  if(state.sleeping) return toast('Zzz... sover nå 💤'); if(getStage() !== 'adult') return toast('Kjæledyret må være fullvoksent først! 🚫'); if(getGlobalCoins() < 100) return toast('Det koster 100 mynter! 🪙');
+  addGlobalCoins(-100); state.prestige = (state.prestige || 0) + 1; state.stats.hunger = 100; state.stats.energy = 100; state.stats.hygiene = 100; state.stats.happiness = 100;
   triggerAction('jump'); SFX.prestige(); spawnSparkles(20); spawnEmojiBurst('✨', 10); toast(`PRESTIGE ${state.prestige}! Mye tøffere nå! ✨`); saveState(); refreshCoinUI(); refreshStatBars();
 }
 function doFeed(){
@@ -1138,12 +1148,16 @@ function tick(){
       if (state.hatchReadyAt && Date.now() < state.hatchReadyAt) {
         const diff = state.hatchReadyAt - Date.now(); const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000);
         lbl.textContent = `Klekker om: ${h}t ${m}m`;
-      } else { lbl.textContent = 'Klar! Trykk 4 ganger på egget for å klekke!'; }
+      } else { lbl.textContent = 'Klar! Trykk på egget for å klekke!'; }
     }
   }
 
+  // Fikset sjekk av meetupScreen - Nå fungerer renderMeetupCanvas perfekt!
   const meetupScreen = document.getElementById('screen-meetup');
-  if (meetupScreen && !meetupScreen.classList.contains('hidden')) { renderMeetupCanvas(); }
+  if (meetupScreen && !meetupScreen.classList.contains('hidden')) { 
+      renderMeetupCanvas(); 
+  }
+  
   requestAnimationFrame(tick);
 }
 
@@ -1214,7 +1228,7 @@ function init(){
   const bCloseShop = document.getElementById('btn-closeShop'); if(bCloseShop) bCloseShop.addEventListener('click', ()=> showScreen('pet') );
 
   if (state) {
-    applyElapsed(); updateEnvironment(); updateClock();
+    applyElapsed(); updateEnvironment(); updateClock(); refreshCoinUI();
     if(!activeSlot){ renderSlotPicker(false); showScreen('slots'); }
     else if(state.phase === 'pet' && state.species){ showScreen('pet'); lastStageSeen = getStage(); }
     else if(state.phase === 'egg' && state.species){ showScreen('egg'); initEggScreen(); }
