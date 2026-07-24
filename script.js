@@ -25,15 +25,24 @@ const SPECIES = {
 };
 
 const SHOP_ITEMS = [
-  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
-  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
-  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
-  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
-  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
-  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
-  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
-  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
-  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
+  { id:'cap', slot:'hat', name:'Caps', emoji:'🧢', price:30 }, 
+  { id:'partyhat', slot:'hat', name:'Festhatt', emoji:'🎉', price:25 },
+  { id:'tophat', slot:'hat', name:'Flosshatt', emoji:'🎩', price:60 }, 
+  { id:'crown', slot:'hat', name:'Krone', emoji:'👑', price:100 },
+  { id:'wizardhat', slot:'hat', name:'Trollmannhatt', emoji:'🧙', price:70 }, 
+  { id:'flowercrown', slot:'hat', name:'Blomsterkrans', emoji:'🌸', price:45 },
+  { id:'sunglasses', slot:'glasses', name:'Solbriller', emoji:'🕶️', price:40 }, 
+  { id:'nerdglasses', slot:'glasses', name:'Nerdebriller', emoji:'🤓', price:35 },
+  { id:'heartglasses', slot:'glasses', name:'Hjertebriller', emoji:'😍', price:45 }, 
+  { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
+  { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, 
+  { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
+  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, 
+  { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
+  { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, 
+  { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
+  { id:'lamp', slot:'lamp', name:'Gulvlampe', emoji:'🪔', price:50 }, 
+  { id:'clock', slot:'clock', name:'Veggklokke', emoji:'🕰️', price:40 }
 ];
 
 const STAGE_LABELS = { baby:'Baby', child:'Barn', teen:'Tenåring', adult:'Voksen' };
@@ -64,10 +73,11 @@ const FOOD_EMOJI = {
   unicorn:'🧁', pig:'🍎', axolotl:'🦐', fennek:'🦂', cheetah:'🥩', lemur:'🍉', redpanda:'🍇', turtle:'🥬', penguin:'🐟', owl:'🐁', hybrid:'🌟'
 };
 
+const FULL_HUNGER_THRESHOLD = 92;
 const ACTION_DURATIONS = { eat:1300, refuse:1000, play:1700, wash:2000, jump:1200, cycle:2200, brush:1800, drive:5000, dino:5000, toilet:1600 };
 const PLAY_VARIANTS = [ {key:'bounce',emoji:'⚽'}, {key:'spin',emoji:'🌀'}, {key:'zoomies',emoji:'💨'}, {key:'wiggle',emoji:'🎉'}, {key:'peekaboo',emoji:'👀'}, {key:'backflip',emoji:'⭐'}, {key:'dance',emoji:'🎵'}, {key:'chase',emoji:'🌪️'}, {key:'wave',emoji:'👋'}, {key:'jump',emoji:'🪀'} ];
 const YAW_MAX = 1.1;
-const EGG_SHAKES_NEEDED = 4; // Raskere klekking
+const EGG_SHAKES_NEEDED = 4;
 
 /* ---------- Tjenester og Grunnfunksjoner ---------- */
 function mixHex(c1, c2) {
@@ -104,10 +114,7 @@ function migrateLegacySave(){
 
 function loadSlotRaw(slotIndex){ 
   if(!slotIndex) return null;
-  try{ 
-    const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]); 
-    return raw ? JSON.parse(raw) : null; 
-  }catch(e){ return null; } 
+  try{ const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } 
 }
 
 function loadState(slot){ 
@@ -246,8 +253,15 @@ function renamePet(){
   state.petName = input.trim().slice(0, 16) || null; saveState();
 }
 
-function earnCoins(n){ if(!state) state = defaultState(); state.coins = (state.coins||0) + n; }
-function refreshCoinUI(){ const c = document.getElementById('coinCount'); if(c && state) c.textContent = state.coins||0; }
+function earnCoins(n){ 
+  if(!state) state = defaultState(); 
+  state.coins = (state.coins||0) + n; 
+}
+
+function refreshCoinUI(){ 
+  const c = document.getElementById('coinCount'); 
+  if(c && state) c.textContent = state.coins||0; 
+}
 
 function renderShop(){
   if(!state) state = defaultState();
@@ -308,7 +322,10 @@ function renderSlotPicker(allowCancel){
         e.stopPropagation(); 
         if(confirm(`Slette Plass ${slotIndex}?`)){ 
           localStorage.removeItem(SLOT_KEYS[slotIndex-1]); 
-          if(slotIndex === activeSlot) { state = defaultState(); activeSlot = null; }
+          if(slotIndex === activeSlot) {
+            state = defaultState();
+            activeSlot = null;
+          }
           renderSlotPicker(allowCancel); 
         } 
       });
@@ -326,9 +343,13 @@ function openMeetupSelect() {
   const hatched = getHatchedSlots(); if(hatched.length < 2) return toast("Minst to levende dyr!");
   const list = document.getElementById('meetupSelectList'); if(!list) return; list.innerHTML = '';
   hatched.forEach(({index, raw}) => {
-    const btn = document.createElement('div'); btn.className = 'meetup-pet-toggle selected'; btn.dataset.index = index;
-    btn.innerHTML = `<div style="font-size:1.8rem;">${SPECIES[raw.species].emoji}</div><div style="font-size:0.7rem; text-align:center;">${displayName(raw)}</div>`;
-    btn.addEventListener('click', () => btn.classList.toggle('selected')); list.appendChild(btn);
+    const btn = document.createElement('div'); 
+    btn.className = 'meetup-pet-toggle'; 
+    btn.dataset.index = index;
+    const sp = SPECIES[raw.species] || SPECIES['cat']; 
+    btn.innerHTML = `<div style="font-size:1.8rem;">${sp.emoji}</div><div style="font-size:0.7rem; text-align:center;">${displayName(raw)}</div>`;
+    btn.addEventListener('click', () => btn.classList.toggle('selected')); 
+    list.appendChild(btn);
   });
   showScreen('meetupSelect');
 }
@@ -336,17 +357,26 @@ function openMeetupSelect() {
 function startMeetupSession() {
   const selectedNodes = document.querySelectorAll('.meetup-pet-toggle.selected');
   if(selectedNodes.length < 2) return toast('Velg minst 2 dyr for lekestund!');
+  
   currentMeetupPets = Array.from(selectedNodes).map(node => { const index = parseInt(node.dataset.index); return { index, raw: loadSlotRaw(index) }; });
   currentMeetupPets.forEach(({raw, index}) => {
     raw.stats.happiness = Math.min(100, raw.stats.happiness + 20); localStorage.setItem(SLOT_KEYS[index-1], JSON.stringify(raw));
     if(activeSlot === index && state) state.stats.happiness = raw.stats.happiness;
   });
+  
   const sub = document.getElementById('meetupSubtitle');
   if(sub) { const names = currentMeetupPets.map(h => displayName(h.raw)); sub.textContent = names.length === 2 ? `${names[0]} og ${names[1]} leker sammen! 🎉` : `${names.length} dyr har en fest sammen! 🎉`; }
+  
   const adults = currentMeetupPets.filter(h => stageFromProgress(h.raw.growthProgress||0) === 'adult');
   const emptySlotIndex = SLOT_INDEXES.find(i => !loadSlotRaw(i));
   const bBreed = document.getElementById('btn-breed');
-  if(bBreed) { if(adults.length === 2 && currentMeetupPets.length === 2 && emptySlotIndex) bBreed.classList.remove('hidden'); else bBreed.classList.add('hidden'); }
+  
+  if(bBreed) { 
+    const kanAvle = (adults.length === 2 && currentMeetupPets.length === 2 && emptySlotIndex);
+    bBreed.classList.toggle('hidden', !kanAvle); 
+    bBreed.style.display = kanAvle ? 'block' : 'none'; 
+  }
+  
   showScreen('meetup'); SFX.hatch();
 }
 
@@ -358,7 +388,7 @@ function doBreed(){
   state.coins -= 100; saveState(); refreshCoinUI();
 
   const p1 = currentMeetupPets[0].raw, p2 = currentMeetupPets[1].raw;
-  const c1 = p1.colors || SPECIES[p1.species], c2 = p2.colors || SPECIES[p2.species];
+  const c1 = p1.colors || SPECIES[p1.species] || SPECIES['cat'], c2 = p2.colors || SPECIES[p2.species] || SPECIES['cat'];
   const newColors = { body: mixHex(c1.body, c2.body), ear: mixHex(c1.ear, c2.ear), pattern: mixHex(c1.pattern, c2.pattern) };
   const hybridDNA = {
     base: p1.species === 'hybrid' ? p1.hybridDNA.base : p1.species, ears: p2.species === 'hybrid' ? p2.hybridDNA.ears : p2.species,
@@ -368,12 +398,17 @@ function doBreed(){
   const hours = Math.floor(Math.random() * 24) + 1; newEgg.hatchReadyAt = Date.now() + (hours * 3600000);
   localStorage.setItem(SLOT_KEYS[emptySlotIndex - 1], JSON.stringify(newEgg));
   SFX.hatch(); spawnEmojiBurst('🧬', 10); toast(`Hybrid-egg i Plass ${emptySlotIndex}! Klekker om ${hours}t! 🥚✨`);
-  const bBreed = document.getElementById('btn-breed'); if (bBreed) bBreed.classList.add('hidden');
+  
+  const bBreed = document.getElementById('btn-breed'); 
+  if (bBreed) { bBreed.classList.add('hidden'); bBreed.style.display = 'none'; }
 }
 
 function renderMeetupCanvas() {
   const canvas = document.getElementById('canvas-meetup'); if(!canvas) return;
-  canvas.width = 400; canvas.height = 300; const ctx = canvas.getContext('2d'); ctx.clearRect(0,0, canvas.width, canvas.height);
+  if(canvas.width !== 400) canvas.width = 400; 
+  if(canvas.height !== 300) canvas.height = 300; 
+  const ctx = canvas.getContext('2d'); ctx.clearRect(0,0, canvas.width, canvas.height);
+  
   const n = currentMeetupPets.length; if(n === 0) return;
   let maxCols = 4; if (n > 12) maxCols = 5; else if (n <= 4) maxCols = n; else if (n === 5 || n === 6) maxCols = 3;
   const numRows = Math.ceil(n / maxCols);
@@ -447,7 +482,11 @@ function drawEggShape(ctx, patternColor, bodyColor, scale, wobble=0, isHybrid=fa
 
 function initEggScreen(){
   if(!state) state = defaultState();
-  const canvas = document.getElementById('canvas-egg'); if(!canvas) return; const ctx = canvas.getContext('2d');
+  const canvas = document.getElementById('canvas-egg'); if(!canvas) return; 
+  if(canvas.width !== 360) canvas.width = 360; 
+  if(canvas.height !== 360) canvas.height = 360;
+  
+  const ctx = canvas.getContext('2d');
   function render(){
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.save(); ctx.translate(canvas.width/2, canvas.height/2+20);
     const sp = SPECIES[state.species] || SPECIES['hybrid']; const c = state.colors || sp; const isHybrid = state.species === 'hybrid';
@@ -567,7 +606,7 @@ function drawEars(ctx, speciesKey, colors, profile, stage){
   } else if (speciesKey === 'fennec') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.8, -r * 0.4); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 28, -50); ctx.lineTo(dir * -10, -20); ctx.closePath(); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.moveTo(dir * 2, -5); ctx.lineTo(dir * 22, -40); ctx.lineTo(dir * -4, -18); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
   } else if (speciesKey === 'redpanda') {
-    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.8, -r * 0.5); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0,0, 12, 0, Math.PI*2); ctx.fillStyle=colors.body; ctx.fill(); ctx.beginPath(); ctx.arc(0,0, 6, 0, Math.PI*2); ctx.fillStyle=colors.pattern; ctx.fill(); ctx.restore(); });
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.65); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 18, -25); ctx.lineTo(dir * -12, -10); ctx.closePath(); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.moveTo(dir * 4, -4); ctx.lineTo(dir * 14, -18); ctx.lineTo(dir * -6, -8); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
   } else if (speciesKey === 'unicorn') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.8); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(dir*10, -20, dir*4, -30); ctx.quadraticCurveTo(-dir*5, -15, -dir*10, 0); ctx.fillStyle=colors.body; ctx.fill(); ctx.restore(); });
     if (profile.features) { ctx.save(); ctx.translate(0, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -35); ctx.lineTo(6, 0); ctx.fillStyle=colors.pattern; ctx.fill(); ctx.beginPath(); ctx.moveTo(-4, -10); ctx.lineTo(4, -15); ctx.lineWidth=2; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-3, -20); ctx.lineTo(3, -25); ctx.stroke(); ctx.restore(); }
@@ -663,17 +702,26 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
 
   drawLimbs(ctx, baseSpecies, colors, profile, profile.bodyY, asleep);
 
-  ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2); 
-  ctx.fillStyle = (baseSpecies === 'panda') ? colors.pattern : colors.body; ctx.fill();
+  // KROPP (Panda og Rød Panda fiks)
+  ctx.beginPath(); ctx.ellipse(0, profile.bodyY, profile.bodyRX, profile.bodyRY, 0, 0, Math.PI*2);
+  ctx.fillStyle = (baseSpecies === 'panda') ? colors.pattern : colors.body; 
+  ctx.fill();
   
-  if(baseSpecies === 'panda') { 
-    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill(); 
-  } else if(baseSpecies === 'penguin' || baseSpecies === 'owl') { 
-    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = colors.pattern; ctx.fill(); 
+  if (baseSpecies === 'panda') { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
+    ctx.fillStyle = colors.body; ctx.fill(); 
+  } else if (baseSpecies === 'redpanda') {
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); 
+    ctx.fillStyle = '#2a2a2a'; ctx.fill(); 
+  } else if (baseSpecies === 'penguin' || baseSpecies === 'owl') { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
+    ctx.fillStyle = colors.pattern; ctx.fill(); 
   } else if (baseSpecies === 'turtle') { 
-    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.fillStyle = '#e5d38a'; ctx.fill(); 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
+    ctx.fillStyle = '#e5d38a'; ctx.fill(); 
   } else { 
-    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill(); 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); 
+    ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill(); 
   }
 
   if(baseSpecies === 'cheetah' && profile.features) { ctx.fillStyle = colors.pattern; [[-10,-10], [15,-5], [-12,5], [10,12], [0,-2]].forEach(([sx,sy]) => { ctx.beginPath(); ctx.arc(sx, profile.bodyY + sy, 2.5, 0, Math.PI*2); ctx.fill(); }); }
@@ -688,15 +736,18 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   const annoyed = sad || (action && action.type==='refuse');
 
   ctx.save(); ctx.translate(faceShift, 0); 
+  
   if(baseSpecies==='panda' && !closedEyes && profile.features){ ctx.fillStyle = colors.ear; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*16,-2,10,12,dir*0.15,0,Math.PI*2); ctx.fill(); }); }
   if((baseSpecies==='monkey' || baseSpecies==='lemur') && profile.features){ ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(0, 0, profile.headR*0.85, profile.headR*0.75, 0, 0, Math.PI*2); ctx.fill(); }
   if(baseSpecies==='redpanda' && !closedEyes && profile.features){ ctx.fillStyle = colors.pattern; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*(eyeDX+2), eyeY+2, eyeR*2, eyeR*1.2, dir*0.2, 0, Math.PI*2); ctx.fill(); }); }
   if(baseSpecies==='owl' && profile.features && !closedEyes) { ctx.fillStyle = colors.pattern; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*eyeDX, eyeY, eyeR*2.5, 0, Math.PI*2); ctx.fill(); }); }
   if(baseSpecies==='pig' && profile.features){ ctx.beginPath(); ctx.ellipse(0, 8, 16, 12, 0, 0, Math.PI*2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(-5, 6, 2.5, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(5, 6, 2.5, 0, Math.PI*2); ctx.fill(); }
-  if((baseSpecies==='fox' || baseSpecies==='dog' || baseSpecies==='lion' || baseSpecies==='unicorn' || baseSpecies==='fennec' || baseSpecies==='cheetah') && profile.features){
+  
+  if(['fox', 'dog', 'lion', 'unicorn', 'fennec', 'cheetah'].includes(baseSpecies) && profile.features){
     ctx.beginPath(); const snoutW = stage === 'adult' ? 18 : (stage === 'teen' ? 16 : 14); const snoutH = stage === 'adult' ? 14 : 12; ctx.ellipse(0, 10, snoutW, snoutH, 0, 0, Math.PI*2);
     if(baseSpecies==='fox') ctx.fillStyle = '#fff8ee'; else if(baseSpecies==='lion' || baseSpecies==='cheetah') ctx.fillStyle = '#f39c12'; else if(baseSpecies==='unicorn') ctx.fillStyle = '#f1f2f6'; else ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fill();
   }
+  
   if (baseSpecies === 'cheetah' && profile.features && !closedEyes) { ctx.strokeStyle = colors.pattern; ctx.lineWidth = 2; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX*0.8, eyeY+eyeR); ctx.quadraticCurveTo(dir*eyeDX*0.3, eyeY+12, dir*6, 10); ctx.stroke(); }); }
   if (isBird && profile.features) { ctx.fillStyle = colors.ear; ctx.beginPath(); ctx.moveTo(-6, 4); ctx.lineTo(6, 4); ctx.lineTo(0, 14); ctx.closePath(); ctx.fill(); }
 
@@ -1052,6 +1103,10 @@ function tick(){
 
     const canvas = document.getElementById('canvas-pet');
     if(canvas) {
+      // Sikrer at oppløsningen holdes korrekt
+      if(canvas.width !== 360) canvas.width = 360; 
+      if(canvas.height !== 360) canvas.height = 360;
+      
       const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width, canvas.height);
       const currentActionProgress = getActionProgress();
       if(currentActionProgress && currentActionProgress.type==='drive') drawCarBody(ctx, currentActionProgress.progress);
@@ -1084,7 +1139,7 @@ function tick(){
       if (state.hatchReadyAt && Date.now() < state.hatchReadyAt) {
         const diff = state.hatchReadyAt - Date.now(); const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000);
         lbl.textContent = `Klekker om: ${h}t ${m}m`;
-      } else { lbl.textContent = 'Klar! Rist (trykk) på egget for å klekke!'; }
+      } else { lbl.textContent = 'Klar! Trykk 4 ganger på egget for å klekke!'; }
     }
   }
 
@@ -1130,7 +1185,7 @@ function init(){
     const sm = document.getElementById('screen-meetup');
     if(sm) {
       const bBtn = document.createElement('button'); bBtn.id = 'btn-breed';
-      bBtn.style.cssText = 'position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:12px 24px; font-size:16px; border-radius:20px; border:none; background:#ff477e; color:white; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3);';
+      bBtn.style.cssText = 'position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:12px 24px; font-size:16px; border-radius:20px; border:none; background:#ff477e; color:white; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:10; display:none;';
       bBtn.innerHTML = '🧬 Lag hybrid-egg (100 🪙)'; sm.appendChild(bBtn); el.btnBreed = bBtn; bBtn.addEventListener('click', doBreed);
     }
   }
