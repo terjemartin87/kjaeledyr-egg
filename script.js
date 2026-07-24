@@ -78,9 +78,42 @@ const PLAY_VARIANTS = [ {key:'bounce',emoji:'⚽'}, {key:'spin',emoji:'🌀'}, {
 const YAW_MAX = 1.1;
 
 
-/* ---------- GLOBALE VARIABLER (Oppdatert og trygget) ---------- */
-let activeSlot = null;
-let state = null;
+/* ---------- Tjenester og Grunnfunksjoner ---------- */
+function mixHex(c1, c2) {
+  if(!c1) c1 = '#ffffff'; if(!c2) c2 = '#ffffff';
+  const hex2rgb = hex => {
+    const h = hex.replace('#',''); const full = h.length === 3 ? h.split('').map(x=>x+x).join('') : h;
+    return [parseInt(full.slice(0,2),16), parseInt(full.slice(2,4),16), parseInt(full.slice(4,6),16)];
+  };
+  const rgb1 = hex2rgb(c1), rgb2 = hex2rgb(c2);
+  const mixed = rgb1.map((v, i) => Math.round((v + rgb2[i]) / 2));
+  return '#' + mixed.map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
+function defaultState(){
+  return { phase:'select', species:null, colors: null, hybridDNA: null, hatchReadyAt: null, petName:null, hatched:false, birthTime:null, growthProgress:0, prestige: 0, lastUpdate:Date.now(), sleeping:false, pacifier:false, muted:false, coins:0, inventory:[], equipped:{}, stats:{ hunger:100, energy:100, hygiene:100, happiness:100 } };
+}
+
+function displayName(s){ 
+  if(!s) return '???';
+  if(s.petName) return s.petName;
+  if(s.species && SPECIES[s.species]) return SPECIES[s.species].name;
+  return '???'; 
+}
+
+function migrateLegacySave(){ const legacy = localStorage.getItem(LEGACY_SAVE_KEY); if(legacy){ if(!localStorage.getItem(SLOT_KEYS[0])){ localStorage.setItem(SLOT_KEYS[0], legacy); localStorage.setItem(ACTIVE_SLOT_KEY, '1'); } localStorage.removeItem(LEGACY_SAVE_KEY); } }
+function loadSlotRaw(slotIndex){ try{ const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } }
+function loadState(){ const parsed = loadSlotRaw(activeSlot); if(!parsed) return defaultState(); return Object.assign(defaultState(), parsed); }
+function saveState(){ if(!activeSlot || !state) return; localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state)); }
+
+
+/* ---------- GLOBALE VARIABLER ---------- */
+migrateLegacySave();
+
+let activeSlot = Number(localStorage.getItem(ACTIVE_SLOT_KEY)) || null;
+let state = activeSlot ? loadState() : defaultState();
+if (!state) state = defaultState();
+
 let audioCtx = null;
 let animFrame = 0;
 let eggShakeCount = 0;
@@ -144,42 +177,26 @@ function ensureNewElementsExist() {
   }
 }
 
-function defaultState(){
-  return { phase:'select', species:null, colors: null, hybridDNA: null, hatchReadyAt: null, petName:null, hatched:false, birthTime:null, growthProgress:0, prestige: 0, lastUpdate:Date.now(), sleeping:false, pacifier:false, muted:false, coins:0, inventory:[], equipped:{}, stats:{ hunger:100, energy:100, hygiene:100, happiness:100 } };
-}
-
-function displayName(s){ 
-  if(!s) return '???';
-  if(s.petName) return s.petName;
-  if(s.species && SPECIES[s.species]) return SPECIES[s.species].name;
-  return '???'; 
-}
-
-function migrateLegacySave(){ const legacy = localStorage.getItem(LEGACY_SAVE_KEY); if(legacy){ if(!localStorage.getItem(SLOT_KEYS[0])){ localStorage.setItem(SLOT_KEYS[0], legacy); localStorage.setItem(ACTIVE_SLOT_KEY, '1'); } localStorage.removeItem(LEGACY_SAVE_KEY); } }
-function loadSlotRaw(slotIndex){ try{ const raw = localStorage.getItem(SLOT_KEYS[slotIndex-1]); return raw ? JSON.parse(raw) : null; }catch(e){ return null; } }
-function loadState(){ const parsed = loadSlotRaw(activeSlot); if(!parsed) return defaultState(); return Object.assign(defaultState(), parsed); }
-function saveState(){ if(!activeSlot) return; localStorage.setItem(SLOT_KEYS[activeSlot-1], JSON.stringify(state)); }
-
 /* ---------- Sound ---------- */
 function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state === 'suspended') audioCtx.resume(); }
 function beep(freq, dur, type='sine', vol=0.18, delay=0){
-  if(state && state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+  if(!state || state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
   osc.type = type; osc.frequency.setValueAtTime(freq, t0); gain.gain.setValueAtTime(0, t0); gain.gain.linearRampToValueAtTime(vol, t0+0.02); gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
   osc.connect(gain).connect(audioCtx.destination); osc.start(t0); osc.stop(t0+dur+0.05);
 }
 function glide(freqFrom, freqTo, dur, type='sine', vol=0.16, delay=0){
-  if(state && state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+  if(!state || state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
   osc.type = type; osc.frequency.setValueAtTime(freqFrom, t0); osc.frequency.exponentialRampToValueAtTime(freqTo, t0+dur); gain.gain.setValueAtTime(0.0001, t0); gain.gain.linearRampToValueAtTime(vol, t0+0.02); gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
   osc.connect(gain).connect(audioCtx.destination); osc.start(t0); osc.stop(t0+dur+0.05);
 }
 function noiseBurst({duration=0.08, freq=800, q=1, type='lowpass', vol=0.2, delay=0}={}){
-  if(state && state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*duration));
+  if(!state || state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*duration));
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<bufferSize;i++) data[i] = Math.random()*2-1;
   const src = audioCtx.createBufferSource(); src.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = type; filter.frequency.value = freq; filter.Q.value = q;
   const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0, t0); gain.gain.linearRampToValueAtTime(vol, t0+0.008); gain.gain.exponentialRampToValueAtTime(0.001, t0+duration); src.connect(filter).connect(gain).connect(audioCtx.destination); src.start(t0); src.stop(t0+duration+0.02);
 }
 function noiseSweep({duration=0.3, freqFrom=2000, freqTo=400, type='bandpass', q=1, vol=0.15, delay=0}={}){
-  if(state && state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*duration));
+  if(!state || state.muted) return; ensureAudio(); const t0 = audioCtx.currentTime + delay; const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*duration));
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<bufferSize;i++) data[i] = Math.random()*2-1;
   const src = audioCtx.createBufferSource(); src.buffer = buffer; const filter = audioCtx.createBiquadFilter(); filter.type = type; filter.Q.value = q; filter.frequency.setValueAtTime(freqFrom, t0); filter.frequency.linearRampToValueAtTime(freqTo, t0+duration);
   const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0, t0); gain.gain.linearRampToValueAtTime(vol, t0+0.03); gain.gain.exponentialRampToValueAtTime(0.001, t0+duration); src.connect(filter).connect(gain).connect(audioCtx.destination); src.start(t0); src.stop(t0+duration+0.02);
@@ -210,16 +227,17 @@ function toast(msg){
 }
 
 function renamePet(){
-  if(state.phase !== 'pet') return;
+  if(!state || state.phase !== 'pet') return;
   const input = prompt('Gi kjæledyret ditt et navn:', state.petName || SPECIES[state.species].name);
   if(input === null) return;
   state.petName = input.trim().slice(0, 16) || null; saveState();
 }
 
-function earnCoins(n){ state.coins = (state.coins||0) + n; }
-function refreshCoinUI(){ const c = document.getElementById('coinCount'); if(c) c.textContent = state.coins||0; }
+function earnCoins(n){ if(!state) state = defaultState(); state.coins = (state.coins||0) + n; }
+function refreshCoinUI(){ const c = document.getElementById('coinCount'); if(c && state) c.textContent = state.coins||0; }
 
 function renderShop(){
+  if(!state) return;
   const sCoins = document.getElementById('shopCoins'); if(sCoins) sCoins.textContent = '🪙 ' + (state.coins||0);
   const grid = document.getElementById('shopGrid'); if(!grid) return; grid.innerHTML = '';
   SHOP_ITEMS.forEach(item=>{
@@ -228,6 +246,7 @@ function renderShop(){
     const priceLabel = owned ? (equipped ? 'På ✓' : 'Trykk for å ta på') : ('🪙 '+item.price);
     div.innerHTML = `<div class="shopIcon">${item.emoji}</div><div class="shopName">${item.name}</div><div class="shopPrice">${priceLabel}</div>`;
     div.addEventListener('click', ()=>{
+      if(!state) return;
       if(!owned){
         if((state.coins||0) < item.price) return toast('Ikke nok mynter 🪙');
         state.coins -= item.price; state.inventory = state.inventory || []; state.inventory.push(item.id);
@@ -272,7 +291,17 @@ function renderSlotPicker(allowCancel){
     card.appendChild(emojiEl); card.appendChild(info);
     if(raw){
       const del = document.createElement('button'); del.className = 'slotDelete'; del.textContent = '🗑'; del.title = 'Slett lagring';
-      del.addEventListener('click', (e)=>{ e.stopPropagation(); if(confirm(`Slette Plass ${slotIndex}?`)){ localStorage.removeItem(SLOT_KEYS[slotIndex-1]); if(slotIndex === activeSlot) state = defaultState(); renderSlotPicker(allowCancel); } });
+      del.addEventListener('click', (e)=>{ 
+        e.stopPropagation(); 
+        if(confirm(`Slette Plass ${slotIndex}?`)){ 
+          localStorage.removeItem(SLOT_KEYS[slotIndex-1]); 
+          if(slotIndex === activeSlot) {
+            state = defaultState();
+            activeSlot = null;
+          }
+          renderSlotPicker(allowCancel); 
+        } 
+      });
       card.appendChild(del);
     }
     card.addEventListener('click', ()=> chooseSlot(slotIndex)); grid.appendChild(card);
@@ -300,7 +329,7 @@ function startMeetupSession() {
   currentMeetupPets = Array.from(selectedNodes).map(node => { const index = parseInt(node.dataset.index); return { index, raw: loadSlotRaw(index) }; });
   currentMeetupPets.forEach(({raw, index}) => {
     raw.stats.happiness = Math.min(100, raw.stats.happiness + 20); localStorage.setItem(SLOT_KEYS[index-1], JSON.stringify(raw));
-    if(activeSlot === index) state.stats.happiness = raw.stats.happiness;
+    if(activeSlot === index && state) state.stats.happiness = raw.stats.happiness;
   });
   const sub = document.getElementById('meetupSubtitle');
   if(sub) { const names = currentMeetupPets.map(h => displayName(h.raw)); sub.textContent = names.length === 2 ? `${names[0]} og ${names[1]} leker sammen! 🎉` : `${names.length} dyr har en fest sammen! 🎉`; }
@@ -315,7 +344,7 @@ function doBreed(){
   if(currentMeetupPets.length !== 2) return toast('Kun 2 voksne dyr for avling! 🧬');
   if(stageFromProgress(currentMeetupPets[0].raw.growthProgress||0) !== 'adult' || stageFromProgress(currentMeetupPets[1].raw.growthProgress||0) !== 'adult') return toast('Begge må være voksne! 🧬');
   const emptySlotIndex = SLOT_INDEXES.find(i => !loadSlotRaw(i)); if(!emptySlotIndex) return toast('Ingen ledige plasser! 🥚');
-  if((state.coins||0) < 100) return toast('Koster 100 mynter! 🪙');
+  if(!state || (state.coins||0) < 100) return toast('Koster 100 mynter! 🪙');
   state.coins -= 100; saveState(); refreshCoinUI();
 
   const p1 = currentMeetupPets[0].raw, p2 = currentMeetupPets[1].raw;
@@ -356,7 +385,8 @@ function renderMeetupCanvas() {
 
 function chooseSlot(slotIndex){
   activeSlot = slotIndex; localStorage.setItem(ACTIVE_SLOT_KEY, String(slotIndex));
-  state = loadState(); eggShakeCount = 0; selectedSpecies = null; currentAction = null; lastStageSeen = null;
+  state = loadState(); if(!state) state = defaultState();
+  eggShakeCount = 0; selectedSpecies = null; currentAction = null; lastStageSeen = null;
   document.querySelectorAll('.eggChoice').forEach(n=>n.classList.remove('selected'));
   const btnConf = document.getElementById('btn-confirmSelect'); if(btnConf) btnConf.disabled = true; applyElapsed();
   if(state.phase === 'pet' && state.species){ showScreen('pet'); lastStageSeen = getStage(); }
@@ -406,6 +436,7 @@ function drawEggShape(ctx, patternColor, bodyColor, scale, wobble=0, isHybrid=fa
 }
 
 function initEggScreen(){
+  if(!state) return;
   const canvas = document.getElementById('canvas-egg'); if(!canvas) return; const ctx = canvas.getContext('2d');
   function render(){
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.save(); ctx.translate(canvas.width/2, canvas.height/2+20);
@@ -419,6 +450,7 @@ function initEggScreen(){
     ctx.restore();
   }
   canvas.onclick = ()=>{
+    if(!state) return;
     if(state.hatchReadyAt && Date.now() < state.hatchReadyAt) { SFX.refuse(); return toast("Magisk egg ruger fortsatt! ⏱️"); }
     eggShakeCount++; eggWobble = (Math.random()-0.5)*0.5; SFX.tap(); render(); setTimeout(()=>{ eggWobble=0; render(); },120);
     if(eggShakeCount >= EGG_SHAKES_NEEDED){ canvas.onclick = null; SFX.crack(); setTimeout(()=>{ SFX.hatch(); hatchEgg(); }, 350); }
@@ -427,13 +459,14 @@ function initEggScreen(){
 }
 
 function hatchEgg(){
+  if(!state) return;
   state.hatched = true; state.phase = 'pet'; state.birthTime = Date.now(); state.growthProgress = 0; state.lastUpdate = Date.now();
   saveState(); showScreen('pet'); spawnSparkles(8); const n = SPECIES[state.species] ? SPECIES[state.species].name : 'Hybriden'; toast(`${n} har klekket! 🎉`);
 }
 
 /* ---------- Pet rendering & scaling ---------- */
 function stageFromProgress(gp){ if(gp >= GROWTH_UNITS.adult) return 'adult'; if(gp >= GROWTH_UNITS.teen) return 'teen'; if(gp >= GROWTH_UNITS.child) return 'child'; return 'baby'; }
-function getStage(){ return stageFromProgress(state.growthProgress || 0); }
+function getStage(){ return state ? stageFromProgress(state.growthProgress || 0) : 'baby'; }
 
 function triggerAction(type, variant){ currentAction = { type, variant, start: performance.now(), duration: ACTION_DURATIONS[type] }; }
 function getActionProgress(){
@@ -649,7 +682,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if (baseSpecies === 'cheetah' && profile.features && !closedEyes) { ctx.strokeStyle = colors.pattern; ctx.lineWidth = 2; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX*0.8, eyeY+eyeR); ctx.quadraticCurveTo(dir*eyeDX*0.3, eyeY+12, dir*6, 10); ctx.stroke(); }); }
   if (isBird && profile.features) { ctx.fillStyle = colors.ear; ctx.beginPath(); ctx.moveTo(-6, 4); ctx.lineTo(6, 4); ctx.lineTo(0, 14); ctx.closePath(); ctx.fill(); }
 
-  if(closedEyes || blink){
+  if(closedEyes || blinkPhase > 0.92){
     ctx.strokeStyle='#3a2a20'; ctx.lineWidth=3; ctx.lineCap='round'; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-8, eyeY); ctx.quadraticCurveTo(dir*eyeDX, eyeY+6, dir*eyeDX+8, eyeY); ctx.stroke(); });
   } else {
     [-1,1].forEach(dir=>{
@@ -735,8 +768,7 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+    let a1, a2; if(opts.prestige === 1) { a1 = 'rgba(255,200,0,0.7)'; a2 = 'rgba(255,50,0,0)'; } else if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -779,7 +811,7 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
     let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -838,7 +870,7 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
 /* ---------- Events & Actions ---------- */
 function setupPetDrag(){
   const canvas = document.getElementById('canvas-pet'); if(!canvas) return;
-  canvas.addEventListener('pointerdown', (e)=>{ if(state.phase !== 'pet') return; isDraggingPet = true; dragStartX = e.clientX; dragStartYaw = petYawTarget; try{ canvas.setPointerCapture(e.pointerId); }catch(err){} const rh = document.getElementById('rotateHint'); if(rh) rh.classList.add('hidden'); });
+  canvas.addEventListener('pointerdown', (e)=>{ if(!state || state.phase !== 'pet') return; isDraggingPet = true; dragStartX = e.clientX; dragStartYaw = petYawTarget; try{ canvas.setPointerCapture(e.pointerId); }catch(err){} const rh = document.getElementById('rotateHint'); if(rh) rh.classList.add('hidden'); });
   canvas.addEventListener('pointermove', (e)=>{ if(!isDraggingPet) return; const dx = e.clientX - dragStartX; petYawTarget = Math.max(-YAW_MAX, Math.min(YAW_MAX, dragStartYaw + dx*0.012)); });
   ['pointerup','pointercancel','pointerleave'].forEach(evt=>{ canvas.addEventListener(evt, ()=>{ isDraggingPet = false; }); });
 }
@@ -853,53 +885,92 @@ function showScreen(name){
   const act = document.getElementById('actions'); if(act) act.style.display = (name === 'pet') ? 'flex' : 'none';
 }
 
+/* ---------- Stat update / decay ---------- */
 function clamp(v){ return Math.max(0, Math.min(100, v)); }
-function updateGrowth(hours){ if(hours <= 0) return; let mult = 1; if(state.stats.happiness >= 90) mult = 1.4; else if(state.stats.happiness >= 70) mult = 1.15; mult *= Math.pow(1.1, state.prestige || 0); state.growthProgress = (state.growthProgress||0) + hours*mult; }
+
+function updateGrowth(hours){
+  if(hours <= 0 || !state) return; let mult = 1;
+  if(state.stats.happiness >= 90) mult = 1.4; else if(state.stats.happiness >= 70) mult = 1.15;
+  mult *= Math.pow(1.1, state.prestige || 0);
+  state.growthProgress = (state.growthProgress||0) + hours*mult;
+}
 
 function applyElapsed(){
+  if(!state) state = defaultState();
   if(state.phase !== 'pet') { state.lastUpdate = Date.now(); return; }
   const now = Date.now(); const hours = (now - state.lastUpdate) / 3600000; if(hours <= 0) return;
   const prestigeDecayFactor = Math.pow(0.85, state.prestige || 0); const s = state.stats;
-  if(state.sleeping){ s.energy = clamp(s.energy + SLEEP_ENERGY_GAIN_PER_HOUR*hours); s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours*SLEEP_DECAY_FACTOR*prestigeDecayFactor); s.hygiene = clamp(s.hygiene - DECAY_PER_HOUR.hygiene*hours*SLEEP_DECAY_FACTOR*prestigeDecayFactor); s.happiness = clamp(s.happiness - DECAY_PER_HOUR.happiness*hours*SLEEP_DECAY_FACTOR*prestigeDecayFactor);
+  if(state.sleeping){
+    s.energy = clamp(s.energy + SLEEP_ENERGY_GAIN_PER_HOUR*hours);
+    s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours*SLEEP_DECAY_FACTOR*prestigeDecayFactor);
+    s.hygiene = clamp(s.hygiene - DECAY_PER_HOUR.hygiene*hours*SLEEP_DECAY_FACTOR*prestigeDecayFactor);
+    s.happiness = clamp(s.happiness - DECAY_PER_HOUR.happiness*hours*SLEEP_DECAY_FACTOR*prestigeDecayFactor);
   } else {
-    s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours*prestigeDecayFactor); s.energy = clamp(s.energy - DECAY_PER_HOUR.energy*hours*prestigeDecayFactor); s.hygiene = clamp(s.hygiene - DECAY_PER_HOUR.hygiene*hours*prestigeDecayFactor);
-    if(state.pacifier) s.happiness = clamp(s.happiness + PACIFIER_HAPPINESS_PER_HOUR*hours); else { let happinessDrop = DECAY_PER_HOUR.happiness*hours*prestigeDecayFactor; if(s.hunger<25 || s.hygiene<25 || s.energy<20) happinessDrop *= 1.6; s.happiness = clamp(s.happiness - happinessDrop); }
-  } updateGrowth(hours); state.lastUpdate = now;
+    s.hunger = clamp(s.hunger - DECAY_PER_HOUR.hunger*hours*prestigeDecayFactor);
+    s.energy = clamp(s.energy - DECAY_PER_HOUR.energy*hours*prestigeDecayFactor);
+    s.hygiene = clamp(s.hygiene - DECAY_PER_HOUR.hygiene*hours*prestigeDecayFactor);
+    if(state.pacifier) {
+      s.happiness = clamp(s.happiness + PACIFIER_HAPPINESS_PER_HOUR*hours);
+    } else {
+      let happinessDrop = DECAY_PER_HOUR.happiness*hours*prestigeDecayFactor;
+      if(s.hunger<25 || s.hygiene<25 || s.energy<20) happinessDrop *= 1.6;
+      s.happiness = clamp(s.happiness - happinessDrop);
+    }
+  }
+  updateGrowth(hours); state.lastUpdate = now;
 }
 
-function refreshStatBars(){ Object.entries(el.fills).forEach(([key,node])=>{ if(!node) return; const v = Math.round(state.stats[key]*10)/10; const vRounded = Math.round(v); node.style.width = vRounded+'%'; node.classList.toggle('bad', vRounded<25); node.classList.toggle('mid', vRounded>=25 && vRounded<55); if(el.nums[key]) el.nums[key].textContent = v.toFixed(1)+'%'; }); }
-function isNeedy(){ const s = state.stats; return s.hunger<25 || s.hygiene<25 || s.happiness<25 || s.energy<15; }
+function refreshStatBars(){
+  if(!state) return;
+  Object.entries(el.fills).forEach(([key,node])=>{
+    if(!node) return;
+    const v = Math.round(state.stats[key]*10)/10; const vRounded = Math.round(v);
+    node.style.width = vRounded+'%'; node.classList.toggle('bad', vRounded<25); node.classList.toggle('mid', vRounded>=25 && vRounded<55);
+    if(el.nums[key]) el.nums[key].textContent = v.toFixed(1)+'%';
+  });
+}
 
+function isNeedy(){ if(!state) return false; const s = state.stats; return s.hunger<25 || s.hygiene<25 || s.happiness<25 || s.energy<15; }
+
+/* ---------- Actions ---------- */
 function doPrestige(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(getStage() !== 'adult') return toast('Kjæledyret må være fullvoksent først! 🚫'); if((state.coins||0) < 100) return toast('Det koster 100 mynter! 🪙');
   state.coins -= 100; state.prestige = (state.prestige || 0) + 1; state.stats.hunger = 100; state.stats.energy = 100; state.stats.hygiene = 100; state.stats.happiness = 100;
   triggerAction('jump'); SFX.prestige(); spawnSparkles(20); spawnEmojiBurst('✨', 10); toast(`PRESTIGE ${state.prestige}! Mye tøffere nå! ✨`); saveState(); refreshCoinUI(); refreshStatBars();
 }
 function doFeed(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(state.pacifier) return toast('Har smokk i munnen 🍼'); if(currentAction) return; if(state.stats.hunger >= FULL_HUNGER_THRESHOLD){ triggerAction('refuse'); SFX.refuse(); toast('Stappmett! Vil ikke ha mer 🙅'); return; }
   triggerAction('eat'); SFX.eat(); state.stats.hunger = clamp(state.stats.hunger+30); state.stats.happiness = clamp(state.stats.happiness+8); state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS; earnCoins(3); saveState(); setTimeout(()=>{ toast('Nam nam, godt mett! 😋'); spawnSparkles(5); }, ACTION_DURATIONS.eat*0.72);
 }
 function doPlay(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(currentAction) return; if(state.stats.energy < 10) return toast('For sliten til å leke 😴');
   const variant = PLAY_VARIANTS[Math.floor(Math.random()*PLAY_VARIANTS.length)]; triggerAction('play', variant.key); SFX.play(variant.key); spawnEmojiBurst(variant.emoji); state.stats.happiness = clamp(state.stats.happiness+25); state.stats.energy = clamp(state.stats.energy-7); state.stats.hunger = clamp(state.stats.hunger-8); state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS; earnCoins(4); toast('Så gøy! '+variant.emoji); saveState();
 }
 function doWash(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(currentAction) return;
   triggerAction('wash'); SFX.washStart(); spawnBubbles(14); state.stats.hygiene = clamp(state.stats.hygiene+40); state.stats.happiness = clamp(state.stats.happiness+5); earnCoins(3); saveState(); setTimeout(()=>{ toast('Skinnende ren! 🧼✨'); }, ACTION_DURATIONS.wash*0.8);
 }
 function doJump(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(currentAction) return; if(state.stats.energy < 8) return toast('For sliten til å hoppe 😴');
   triggerAction('jump'); SFX.jump(); spawnEmojiBurst('✨', 4); state.stats.happiness = clamp(state.stats.happiness+14); state.stats.energy = clamp(state.stats.energy-6); state.stats.hunger = clamp(state.stats.hunger-6); state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS; earnCoins(2); toast('Hopp hopp! 🤸'); saveState();
 }
 function doCycle(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(currentAction) return; if(state.stats.energy < 15) return toast('For sliten til å sykle 😴');
   triggerAction('cycle'); SFX.cycle(); spawnEmojiBurst('🚲', 4); state.stats.happiness = clamp(state.stats.happiness+22); state.stats.energy = clamp(state.stats.energy-14); state.stats.hygiene = clamp(state.stats.hygiene-10); state.stats.hunger = clamp(state.stats.hunger-12); state.growthProgress = (state.growthProgress||0) + GROWTH_ACTION_BONUS*1.3; earnCoins(4); toast('Sykkeltur! 🚲'); saveState();
 }
 function doBrushTeeth(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(state.pacifier) return toast('Har smokk i munnen 🍼'); if(currentAction) return;
   triggerAction('brush'); SFX.brush(); state.stats.hygiene = clamp(state.stats.hygiene+22); state.stats.happiness = clamp(state.stats.happiness+5); earnCoins(2); saveState(); setTimeout(()=>{ toast('Skinnende rene tenner! 🪥✨'); spawnSparkles(4); }, ACTION_DURATIONS.brush*0.7);
 }
 function doDrive(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(currentAction) return; if(getStage() !== 'adult') return toast('For lite til å kjøre bil ennå 🚗');
   triggerAction('drive'); SFX.drive(); spawnEmojiBurst('💨', 4); state.stats.happiness = clamp(state.stats.happiness+18); state.stats.energy = clamp(state.stats.energy-8); state.stats.hunger = clamp(state.stats.hunger-6); earnCoins(5); toast('Kjører en tur! 🚗'); saveState(); setTimeout(()=>{ toast('Så gøy tur det var! 🎉'); }, ACTION_DURATIONS.drive-400);
 }
@@ -911,6 +982,7 @@ function drawCarBody(ctx, progress){
   [-56,56].forEach(wx=>{ ctx.save(); ctx.translate(wx, 42); ctx.rotate(wheelRot); ctx.beginPath(); ctx.arc(0,0,19,0,Math.PI*2); ctx.fillStyle='#2a2a2a'; ctx.fill(); ctx.strokeStyle='#999'; ctx.lineWidth=2.5; for(let s=0;s<4;s++){ ctx.beginPath(); ctx.moveTo(-19,0); ctx.lineTo(19,0); ctx.stroke(); ctx.rotate(Math.PI/4); } ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fillStyle='#ccc'; ctx.fill(); ctx.restore(); }); ctx.restore();
 }
 function doDino(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(currentAction) return;
   triggerAction('dino'); SFX.dinoRoar(); spawnEmojiBurst('🦖', 3); state.stats.happiness = clamp(state.stats.happiness+20); state.stats.energy = clamp(state.stats.energy-6); earnCoins(5); toast('Ri på dinosaur! 🦖'); saveState(); setTimeout(()=>{ toast('For en tur på dinosaur! 🌴'); }, ACTION_DURATIONS.dino-400);
 }
@@ -926,6 +998,7 @@ function drawDinoBody(ctx, progress){
   for(let t=0;t<3;t++){ ctx.beginPath(); ctx.moveTo(6+t*8,12); ctx.lineTo(9+t*8,17); ctx.lineTo(3+t*8,17); ctx.closePath(); ctx.fill(); } ctx.fillStyle='#1c1c1c'; ctx.beginPath(); ctx.arc(6,-10,4,0,Math.PI*2); ctx.fill(); ctx.restore(); ctx.restore();
 }
 function doToilet(){
+  if(!state) return;
   if(state.sleeping) return toast('Zzz... sover nå 💤'); if(state.pacifier) return toast('Har smokk i munnen 🍼'); if(currentAction) return;
   triggerAction('toilet'); SFX.fart(); spawnEmojiBurst('💨', 4); state.stats.happiness = clamp(state.stats.happiness+10); state.stats.hygiene = clamp(state.stats.hygiene-8); earnCoins(2); toast('Fiiuu, mye bedre! 💨'); saveState();
 }
@@ -933,13 +1006,14 @@ function drawToiletOverlay(ctx, progress){
   ctx.save(); ctx.translate(180, 250); ctx.fillStyle='#e8eef2'; ctx.fillRect(-46,-10,92,26); ctx.fillStyle='#d4dde3'; ctx.fillRect(-30,-38,60,30); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(0,16,40,18,0,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=2; ctx.stroke();
   const puffCount = 4; for(let i=0;i<puffCount;i++){ const p = (progress + i/puffCount) % 1; const alpha = Math.sin(p*Math.PI); ctx.globalAlpha = Math.max(0, alpha*0.8); ctx.font = `${18+p*14}px sans-serif`; ctx.fillText('💨', 30+i*8-20*p, -40-p*40); } ctx.globalAlpha = 1; ctx.restore();
 }
-function doTogglePacifier(){ state.pacifier = !state.pacifier; if(state.pacifier){ SFX.pacifierIn(); toast('God og rolig 🍼'); } else { SFX.pacifierOut(); toast('Smokk ut!'); } saveState(); refreshPacifierUI(); }
-function refreshPacifierUI(){ const btn = document.getElementById('btn-pacifier'); if(btn) btn.classList.toggle('activeToggle', !!state.pacifier); }
-function doToggleSleep(){ state.sleeping = !state.sleeping; if(state.sleeping){ SFX.sleep(); toast('God natt 🌙'); } else { SFX.wake(); toast('God morgen! ☀️'); } saveState(); refreshSleepUI(); }
-function refreshSleepUI(){ const overlay = document.getElementById('sleepOverlay'); if(overlay) { overlay.classList.toggle('hidden', !state.sleeping); overlay.textContent = state.sleeping ? '💤' : ''; } }
+function doTogglePacifier(){ if(!state) return; state.pacifier = !state.pacifier; if(state.pacifier){ SFX.pacifierIn(); toast('God og rolig 🍼'); } else { SFX.pacifierOut(); toast('Smokk ut!'); } saveState(); refreshPacifierUI(); }
+function refreshPacifierUI(){ const btn = document.getElementById('btn-pacifier'); if(btn && state) btn.classList.toggle('activeToggle', !!state.pacifier); }
+function doToggleSleep(){ if(!state) return; state.sleeping = !state.sleeping; if(state.sleeping){ SFX.sleep(); toast('God natt 🌙'); } else { SFX.wake(); toast('God morgen! ☀️'); } saveState(); refreshSleepUI(); }
+function refreshSleepUI(){ const overlay = document.getElementById('sleepOverlay'); if(overlay && state) { overlay.classList.toggle('hidden', !state.sleeping); overlay.textContent = state.sleeping ? '💤' : ''; } }
 
 /* ---------- Main loop ---------- */
 function tick(){
+  if (!state) state = defaultState(); // Siste sikkerhetsnett i loopen
   animFrame++; bounceTime += 0.03; blinkPhase = (blinkPhase+0.01) % 1;
   if(!isDraggingPet) petYawTarget *= 0.93; petYaw += (petYawTarget - petYaw) * 0.25;
 
@@ -1002,6 +1076,7 @@ function updateClock(){
   const cLbl = document.getElementById('clockLabel'); if(cLbl) cLbl.textContent = `${isDay?'☀️':'🌙'} ${hh}:${mm}`;
 }
 function refreshRoomDecor(){
+  if(!state) return;
   const eq = state.equipped || {};
   const rp = document.getElementById('roomPlant'), rp2 = document.getElementById('roomPlant2'), rpst = document.getElementById('roomPoster'), rl = document.getElementById('roomLamp'), rc = document.getElementById('roomClock');
   if(rp) rp.classList.toggle('hidden', eq.plant !== 'plant'); if(rp2) rp2.classList.toggle('hidden', eq.plant2 !== 'plant2');
@@ -1011,6 +1086,8 @@ function refreshRoomDecor(){
 
 /* ---------- Init ---------- */
 function init(){
+  if (!state) state = defaultState(); // Siste sikkerhetsnett før start
+  
   ensureNewElementsExist(); buildEggGrid(); setupPetDrag();
 
   if (!document.getElementById('btn-prestige')) {
@@ -1051,7 +1128,7 @@ function init(){
   const bCloseMeetup = document.getElementById('btn-closeMeetup'); if(bCloseMeetup) bCloseMeetup.addEventListener('click', ()=>{ renderSlotPicker(true); showScreen('slots'); });
 
   const pName = document.getElementById('petName'); if(pName) pName.addEventListener('click', renamePet);
-  const bCoins = document.getElementById('btn-coins'); if(bCoins) bCoins.addEventListener('click', ()=>{ if(state.phase !== 'pet'){ return toast('Ingen kjæledyr å pynte ennå 🛍️'); } renderShop(); showScreen('shop'); });
+  const bCoins = document.getElementById('btn-coins'); if(bCoins) bCoins.addEventListener('click', ()=>{ if(state && state.phase !== 'pet'){ return toast('Ingen kjæledyr å pynte ennå 🛍️'); } renderShop(); showScreen('shop'); });
   const bCloseShop = document.getElementById('btn-closeShop'); if(bCloseShop) bCloseShop.addEventListener('click', ()=> showScreen('pet') );
 
   applyElapsed(); updateEnvironment(); updateClock();
