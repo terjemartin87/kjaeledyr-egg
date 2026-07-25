@@ -638,7 +638,7 @@ function drawEars(ctx, speciesKey, colors, profile, stage){
   } else if (speciesKey === 'fox') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.65, -r * 0.65); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 16, -36); ctx.lineTo(dir * -14, -10); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.moveTo(dir * 12, -26); ctx.lineTo(dir * 16, -36); ctx.lineTo(dir * 6, -20); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(dir * 2, -4); ctx.lineTo(dir * 8, -24); ctx.lineTo(dir * -8, -8); ctx.closePath(); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
   } else if (speciesKey === 'panda') {
-    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.75); ctx.scale(s, s); ctx.beginPath(); ctx.arc(dir * 6, -6, 16, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore(); });
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.7); ctx.scale(s, s); ctx.beginPath(); ctx.arc(dir * 4, -4, 13, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.restore(); });
   } else if (speciesKey === 'bunny') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.ellipse(dir * 4, -25, 10, 36, dir * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(dir * 4, -24, 4.5, 26, dir * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
   }
@@ -730,9 +730,9 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
     ctx.fillStyle = colors.body; ctx.fill(); 
   } else if (baseSpecies === 'redpanda') {
-    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); 
-    ctx.fillStyle = '#2a2a2a'; ctx.fill(); 
-  } else if (baseSpecies === 'penguin' || baseSpecies === 'owl') { 
+    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.35, profile.bodyRX*0.4, profile.bodyRY*0.35, 0, 0, Math.PI*2);
+    ctx.fillStyle = '#2a2a2a'; ctx.fill();
+  } else if (baseSpecies === 'penguin' || baseSpecies === 'owl') {
     ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
     ctx.fillStyle = colors.pattern; ctx.fill(); 
   } else if (baseSpecies === 'turtle') { 
@@ -757,7 +757,8 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   ctx.save(); ctx.translate(faceShift, 0); 
   
   if(baseSpecies==='panda' && !closedEyes && profile.features){ ctx.fillStyle = colors.ear; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*16,-2,10,12,dir*0.15,0,Math.PI*2); ctx.fill(); }); }
-  if((baseSpecies==='monkey' || baseSpecies==='lemur') && profile.features){ ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(0, 0, profile.headR*0.85, profile.headR*0.75, 0, 0, Math.PI*2); ctx.fill(); }
+  if(baseSpecies==='monkey' && profile.features){ ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(0, 0, profile.headR*0.85, profile.headR*0.75, 0, 0, Math.PI*2); ctx.fill(); }
+  if(baseSpecies==='lemur' && profile.features){ ctx.fillStyle = '#f5f5f0'; ctx.beginPath(); ctx.ellipse(0, 2, profile.headR*0.8, profile.headR*0.68, 0, 0, Math.PI*2); ctx.fill(); }
   if(baseSpecies==='redpanda' && !closedEyes && profile.features){ ctx.fillStyle = colors.pattern; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*(eyeDX+2), eyeY+2, eyeR*2, eyeR*1.2, dir*0.2, 0, Math.PI*2); ctx.fill(); }); }
   if(baseSpecies==='owl' && profile.features && !closedEyes) { ctx.fillStyle = colors.pattern; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*eyeDX, eyeY, eyeR*2.5, 0, Math.PI*2); ctx.fill(); }); }
   if(baseSpecies==='pig' && profile.features){ ctx.beginPath(); ctx.ellipse(0, 8, 16, 12, 0, 0, Math.PI*2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.arc(-5, 6, 2.5, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(5, 6, 2.5, 0, Math.PI*2); ctx.fill(); }
