@@ -62,12 +62,15 @@ const SLEEP_ENERGY_GAIN_PER_HOUR = 1800;
 const SLEEP_DECAY_FACTOR = 0.4;
 const PACIFIER_HAPPINESS_PER_HOUR = 40;
 
-const SLOT_COUNT = 20; 
+const SLOT_COUNT = 20;
 const SLOT_KEYS = Array.from({length:SLOT_COUNT}, (_,i)=>`petgame_save_slot${i+1}`);
 const SLOT_INDEXES = Array.from({length:SLOT_COUNT}, (_,i)=>i+1);
 const ACTIVE_SLOT_KEY = 'petgame_active_slot';
 const LEGACY_SAVE_KEY = 'petgame_save_v1';
 const GLOBAL_COINS_KEY = 'petgame_global_coins';
+const LAST_INCOME_KEY = 'petgame_last_income_ts';
+const PASSIVE_INCOME_PER_HOUR = 6;
+const INCOME_CHECK_INTERVAL = 60000;
 
 const FOOD_EMOJI = { 
   cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗', lion:'🥩', monkey:'🍌', 
@@ -84,6 +87,21 @@ const EGG_SHAKES_NEEDED = 4;
 function getGlobalCoins() { return parseInt(localStorage.getItem(GLOBAL_COINS_KEY)) || 0; }
 function addGlobalCoins(n) { const c = Math.max(0, getGlobalCoins() + n); localStorage.setItem(GLOBAL_COINS_KEY, c); return c; }
 
+function countActivePets(){
+  return SLOT_INDEXES.reduce((n, i) => { const raw = loadSlotRaw(i); return n + (raw && raw.phase === 'pet' ? 1 : 0); }, 0);
+}
+
+function collectPassiveIncome(){
+  const now = Date.now();
+  const last = parseInt(localStorage.getItem(LAST_INCOME_KEY)) || now;
+  localStorage.setItem(LAST_INCOME_KEY, String(now));
+  const hours = (now - last) / 3600000; if(hours <= 0) return 0;
+  const activePets = countActivePets(); if(activePets <= 0) return 0;
+  const earned = Math.floor(activePets * PASSIVE_INCOME_PER_HOUR * hours);
+  if(earned > 0) addGlobalCoins(earned);
+  return earned;
+}
+
 function mixHex(c1, c2) {
   if(!c1) c1 = '#ffffff'; if(!c2) c2 = '#ffffff';
   const hex2rgb = hex => {
@@ -99,11 +117,19 @@ function defaultState(){
   return { phase:'select', species:null, colors: null, hybridDNA: null, hatchReadyAt: null, petName:null, hatched:false, birthTime:null, growthProgress:0, prestige: 0, lastUpdate:Date.now(), sleeping:false, pacifier:false, muted:false, inventory:[], equipped:{}, stats:{ hunger:100, energy:100, hygiene:100, happiness:100 } };
 }
 
-function displayName(s){ 
+function hybridName(dna){
+  if(!dna) return SPECIES.hybrid.name;
+  const base = SPECIES[dna.base] ? SPECIES[dna.base].name : '???';
+  const ears = SPECIES[dna.ears] ? SPECIES[dna.ears].name : '???';
+  return base === ears ? base : `${base} × ${ears}`;
+}
+
+function displayName(s){
   if(!s) return '???';
   if(s.petName) return s.petName;
+  if(s.species === 'hybrid' && s.hybridDNA) return (s.legendary ? '🌟 ' : '') + hybridName(s.hybridDNA);
   if(s.species && SPECIES[s.species]) return SPECIES[s.species].name;
-  return '???'; 
+  return '???';
 }
 
 function migrateLegacySave(){ 
@@ -141,7 +167,7 @@ if (!state || typeof state !== 'object') state = defaultState();
 
 let audioCtx = null, animFrame = 0, eggShakeCount = 0, eggWobble = 0, selectedSpecies = null;
 let currentAction = null, growthPulseUntil = 0, petYaw = 0, petYawTarget = 0, isDraggingPet = false, dragStartX = 0, dragStartYaw = 0, currentMeetupPets = [];
-let lastStageSeen = null, blinkPhase = 0, bounceTime = 0, toastTimer = null, lastEnvUpdate = 0, lastNonSlotScreen = 'select', wakeLock = null;
+let lastStageSeen = null, blinkPhase = 0, bounceTime = 0, toastTimer = null, lastEnvUpdate = 0, lastNonSlotScreen = 'select', wakeLock = null, lastIncomeTick = 0;
 
 /* ---------- DOM refs ---------- */
 const el = {
@@ -308,8 +334,8 @@ function renderSlotPicker(allowCancel){
     const raw = loadSlotRaw(slotIndex); const card = document.createElement('div'); card.className = 'slotCard' + (slotIndex===activeSlot ? ' active' : '');
     let emoji = '🥚', title = `Plass ${slotIndex}`, subtitle = 'Tom - start nytt eventyr';
     if(raw && raw.species && SPECIES[raw.species]){
-      emoji = SPECIES[raw.species].emoji; title = displayName(raw);
-      if(raw.phase === 'egg') subtitle = raw.hatchReadyAt && Date.now() < raw.hatchReadyAt ? 'Ruger på hybrid...' : 'Egg, ikke klekket enda';
+      emoji = raw.legendary ? '🌟' : SPECIES[raw.species].emoji; title = displayName(raw);
+      if(raw.phase === 'egg') subtitle = raw.hatchReadyAt && Date.now() < raw.hatchReadyAt ? 'Ruger fortsatt...' : 'Egg, ikke klekket enda';
       else if(raw.phase === 'pet') { subtitle = STAGE_LABELS[stageFromProgress(raw.growthProgress||0)] || 'Aktivt kjæledyr'; if(raw.prestige > 0) subtitle += ` 🔥${raw.prestige}`; }
     }
     const emojiEl = document.createElement('div'); emojiEl.className = 'slotEmoji'; emojiEl.textContent = emoji;
@@ -373,8 +399,10 @@ function startMeetupSession() {
   if(bBreed) { 
     // Sørger for at knappen gjemmer seg totalt hvis kravene ikke er møtt
     if(adults.length === 2 && currentMeetupPets.length === 2 && emptySlotIndex) {
-      bBreed.classList.remove('hidden'); 
-      bBreed.style.display = 'block'; 
+      const bothHybrid = adults[0].raw.species === 'hybrid' && adults[1].raw.species === 'hybrid';
+      bBreed.innerHTML = bothHybrid ? '🌟 Lag LEGENDARISK egg (250 🪙)' : '🧬 Lag hybrid-egg (100 🪙)';
+      bBreed.classList.remove('hidden');
+      bBreed.style.display = 'block';
     } else {
       bBreed.classList.add('hidden'); 
       bBreed.style.display = 'none'; 
@@ -392,9 +420,11 @@ function doBreed(){
   }
   
   const emptySlotIndex = SLOT_INDEXES.find(i => !loadSlotRaw(i)); if(!emptySlotIndex) return toast('Ingen ledige plasser! 🥚');
-  if(getGlobalCoins() < 100) return toast('Koster 100 mynter! 🪙');
-  
-  addGlobalCoins(-100); refreshCoinUI();
+  const bothHybrid = p1.species === 'hybrid' && p2.species === 'hybrid';
+  const cost = bothHybrid ? 250 : 100;
+  if(getGlobalCoins() < cost) return toast(`Koster ${cost} mynter! 🪙`);
+
+  addGlobalCoins(-cost); refreshCoinUI();
 
   const c1 = p1.colors || SPECIES[p1.species] || SPECIES['cat'], c2 = p2.colors || SPECIES[p2.species] || SPECIES['cat'];
   const newColors = { body: mixHex(c1.body, c2.body), ear: mixHex(c1.ear, c2.ear), pattern: mixHex(c1.pattern, c2.pattern) };
@@ -402,10 +432,12 @@ function doBreed(){
     base: p1.species === 'hybrid' ? p1.hybridDNA.base : p1.species, ears: p2.species === 'hybrid' ? p2.hybridDNA.ears : p2.species,
     tail: Math.random() > 0.5 ? (p1.species==='hybrid'?p1.hybridDNA.tail:p1.species) : (p2.species==='hybrid'?p2.hybridDNA.tail:p2.species)
   };
-  const newEgg = defaultState(); newEgg.species = 'hybrid'; newEgg.hybridDNA = hybridDNA; newEgg.colors = newColors; newEgg.phase = 'egg';
-  const hours = Math.floor(Math.random() * 24) + 1; newEgg.hatchReadyAt = Date.now() + (hours * 3600000);
+  const newEgg = defaultState(); newEgg.species = 'hybrid'; newEgg.hybridDNA = hybridDNA; newEgg.colors = newColors; newEgg.phase = 'egg'; newEgg.legendary = bothHybrid;
+  const hours = bothHybrid ? Math.floor(Math.random() * 12) + 6 : Math.floor(Math.random() * 24) + 1; newEgg.hatchReadyAt = Date.now() + (hours * 3600000);
   localStorage.setItem(SLOT_KEYS[emptySlotIndex - 1], JSON.stringify(newEgg));
-  SFX.hatch(); spawnEmojiBurst('🧬', 10); toast(`Hybrid-egg i Plass ${emptySlotIndex}! Klekker om ${hours}t! 🥚✨`);
+  SFX.hatch(); spawnEmojiBurst(bothHybrid ? '🌟' : '🧬', bothHybrid ? 20 : 10);
+  const prefix = bothHybrid ? '🌟 LEGENDARISK ' : '';
+  toast(`${prefix}${hybridName(hybridDNA)}-egg i Plass ${emptySlotIndex}! Klekker om ${hours}t! 🥚✨`);
   
   const bBreed = document.getElementById('btn-breed'); 
   if (bBreed) { bBreed.classList.add('hidden'); bBreed.style.display = 'none'; }
@@ -510,6 +542,12 @@ function initEggScreen(){
     ctx.clearRect(0,0,canvas.width,canvas.height); ctx.save(); ctx.translate(canvas.width/2, canvas.height/2+20);
     const sp = SPECIES[state.species] || SPECIES['hybrid']; const c = state.colors || sp; const isHybrid = state.species === 'hybrid';
     const float = isHybrid ? Math.sin(bounceTime * 3) * 10 : 0; ctx.translate(0, float);
+    if(state.legendary){
+      const auraR = 120 + Math.sin(bounceTime * 5) * 12;
+      const grad = ctx.createRadialGradient(0,0,auraR*0.2, 0,0,auraR);
+      grad.addColorStop(0, 'rgba(255,215,0,0.55)'); grad.addColorStop(1, 'rgba(255,100,0,0)');
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0,0,auraR,0,Math.PI*2); ctx.fill();
+    }
     drawEggShape(ctx, c.pattern, c.body, 2.2, eggWobble, isHybrid);
     if(eggShakeCount > 0){
       ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=3; const crackLevel = Math.min(eggShakeCount, EGG_SHAKES_NEEDED);
@@ -529,7 +567,9 @@ function initEggScreen(){
 function hatchEgg(){
   if(!state) state = defaultState();
   state.hatched = true; state.phase = 'pet'; state.birthTime = Date.now(); state.growthProgress = 0; state.lastUpdate = Date.now();
-  saveState(); showScreen('pet'); spawnSparkles(8); const n = SPECIES[state.species] ? SPECIES[state.species].name : 'Hybriden'; toast(`${n} har klekket! 🎉`);
+  if(state.legendary){ state.prestige = Math.max(state.prestige || 0, 1); addGlobalCoins(150); refreshCoinUI(); }
+  saveState(); showScreen('pet'); spawnSparkles(state.legendary ? 24 : 8);
+  toast(state.legendary ? `${displayName(state)} har klekket! Legendarisk! 🌟🎉` : `${displayName(state)} har klekket! 🎉`);
 }
 
 /* ---------- Pet rendering & scaling ---------- */
@@ -641,6 +681,20 @@ function drawEars(ctx, speciesKey, colors, profile, stage){
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.7); ctx.scale(s, s); ctx.beginPath(); ctx.arc(dir * 4, -4, 13, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.restore(); });
   } else if (speciesKey === 'bunny') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.ellipse(dir * 4, -25, 10, 36, dir * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(dir * 4, -24, 4.5, 26, dir * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
+  } else if (speciesKey === 'dragon') {
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.6, -r * 0.75); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 5); ctx.lineTo(dir * 10, -22); ctx.lineTo(dir * -6, -8); ctx.closePath(); ctx.fillStyle = colors.body; ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.moveTo(dir * 2, 0); ctx.lineTo(dir * 7, -15); ctx.lineTo(dir * -2, -6); ctx.closePath(); ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'axolotl') {
+    ctx.strokeStyle = colors.ear; ctx.lineWidth = 4 * s; ctx.lineCap = 'round';
+    [-1, 1].forEach(dir => { for(let i=0;i<3;i++){ ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.35 + i * 8 * s); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(dir * 14, -6, dir * 20, 2); ctx.stroke(); ctx.restore(); } });
+  } else if (speciesKey === 'turtle') {
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.85, -r * 0.35); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'penguin') {
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.8, -r * 0.5); ctx.scale(s, s); ctx.beginPath(); ctx.ellipse(0, 0, 7, 11, dir * 0.3, 0, Math.PI * 2); ctx.fillStyle = colors.pattern; ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'snake' || speciesKey === 'gecko') {
+    ctx.fillStyle = colors.pattern;
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.7); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 8, -14); ctx.lineTo(dir * -4, -4); ctx.closePath(); ctx.fill(); ctx.restore(); });
+  } else {
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.55); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0, -6, 11, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.beginPath(); ctx.arc(dir * 1.5, -6, 5.5, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.restore(); });
   }
 }
 
@@ -662,7 +716,11 @@ function drawTail(ctx, speciesKey, colors, profile, stage){
   } else if (speciesKey === 'cat') { ctx.translate(bx * 0.85, by * 0.1); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(30, 0, 32, -25); ctx.quadraticCurveTo(34, -40, 20, -40); ctx.lineWidth = 12; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke();
   } else if (speciesKey === 'fox') { ctx.translate(bx * 0.8, by * 0.1); ctx.scale(s, s); ctx.beginPath(); ctx.ellipse(25, 0, 30, 15, -0.4, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.beginPath(); ctx.ellipse(48, -10, 10, 7, -0.4, 0, Math.PI * 2); ctx.fillStyle = '#fff8ee'; ctx.fill();
   } else if (speciesKey === 'panda') { ctx.translate(bx * 0.85, by * 0.4); ctx.scale(s, s); ctx.beginPath(); ctx.arc(5, 0, 9, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
-  } else if (speciesKey === 'bunny') { ctx.translate(bx * 0.85, by * 0.3); ctx.scale(s, s); ctx.beginPath(); ctx.arc(5, 0, 10, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
+  } else if (speciesKey === 'bunny') { ctx.translate(bx * 0.85, by * 0.3); ctx.scale(s, s); ctx.beginPath(); ctx.arc(5, 0, 10, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+  } else if (speciesKey === 'fennec') { ctx.translate(bx * 0.85, by * 0.15); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(26, 10, 32, -14); ctx.lineWidth = 9; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke(); ctx.beginPath(); ctx.arc(32, -14, 6, 0, Math.PI * 2); ctx.fillStyle = '#fff8ee'; ctx.fill();
+  } else if (speciesKey === 'axolotl') { ctx.translate(bx * 0.8, by * 0.3); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, -10); ctx.quadraticCurveTo(20, -5, 28, 10); ctx.quadraticCurveTo(14, 8, 0, 18); ctx.closePath(); ctx.fillStyle = colors.pattern; ctx.fill();
+  } else if (speciesKey === 'snake' || speciesKey === 'gecko') { ctx.translate(bx * 0.85, by * 0.35); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20, 8, 26, 26); ctx.lineWidth = 7; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke();
+  } else { ctx.translate(bx * 0.85, by * 0.2); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(24, 10, 30, 26); ctx.lineWidth = 8; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke(); }
   ctx.restore();
 }
 
@@ -1117,6 +1175,12 @@ function tick(){
   animFrame++; bounceTime += 0.03; blinkPhase = (blinkPhase+0.01) % 1;
   if(!isDraggingPet) petYawTarget *= 0.93; petYaw += (petYawTarget - petYaw) * 0.25;
 
+  if(Date.now() - lastIncomeTick > INCOME_CHECK_INTERVAL){
+    lastIncomeTick = Date.now();
+    const earned = collectPassiveIncome();
+    if(earned > 0) refreshCoinUI();
+  }
+
   if(state.phase === 'pet'){
     applyElapsed(); refreshStatBars(); const stage = getStage();
     if(lastStageSeen && stage !== lastStageSeen){ SFX.grow(); toast(`${SPECIES[state.species] ? SPECIES[state.species].name : 'Hybriden'} har vokst! 🌱`); spawnSparkles(14); growthPulseUntil = performance.now() + 700; }
@@ -1154,6 +1218,8 @@ function tick(){
 
     if(Date.now() - lastEnvUpdate > 30000){ updateEnvironment(); updateClock(); lastEnvUpdate = Date.now(); }
   } else if (state.phase === 'egg') {
+    const nameLbl = document.getElementById('eggNameLabel');
+    if(nameLbl) nameLbl.textContent = state.species === 'hybrid' ? `Kanskje en ${displayName(state)}?` : `Ruger på en ${displayName(state)}`;
     const lbl = document.getElementById('eggTimerLabel');
     if(lbl) {
       if (state.hatchReadyAt && Date.now() < state.hatchReadyAt) {
@@ -1235,7 +1301,10 @@ function init(){
   const bCloseShop = document.getElementById('btn-closeShop'); if(bCloseShop) bCloseShop.addEventListener('click', ()=> showScreen('pet') );
 
   if (state) {
-    applyElapsed(); updateEnvironment(); updateClock(); refreshCoinUI();
+    applyElapsed(); updateEnvironment(); updateClock();
+    const passiveEarned = collectPassiveIncome();
+    refreshCoinUI();
+    if(passiveEarned > 0) toast(`Mens du var borte: +${passiveEarned} 🪙 fra kjæledyrene dine! 🏠`);
     if(!activeSlot){ renderSlotPicker(false); showScreen('slots'); }
     else if(state.phase === 'pet' && state.species){ showScreen('pet'); lastStageSeen = getStage(); }
     else if(state.phase === 'egg' && state.species){ showScreen('egg'); initEggScreen(); }
