@@ -17,7 +17,7 @@ const SPECIES = {
   cheetah:  { name:'Gepard',   body:'#f1c40f', ear:'#d35400', pattern:'#2a2a2a', eyeType:'round', emoji:'🐆' },
   lemur:    { name:'Lemur',    body:'#aeb6bf', ear:'#7f8c8d', pattern:'#2a2a2a', eyeType:'round', emoji:'🐒' },
   redpanda: { name:'Rød Panda',body:'#d35400', ear:'#e67e22', pattern:'#ffffff', eyeType:'round', emoji:'🐼' },
-  turtle:   { name:'Skilpadde',body:'#7fb87a', ear:'#4d8549', pattern:'#2d4c2b', eyeType:'round', emoji:'🐢' },
+  turtle:   { name:'Skilpadde',body:'#7fb87a', ear:'#4d8549', pattern:'#2d4c2b', eyeType:'round', emoji:'🐢', bodyPlan:'turtle' },
   penguin:  { name:'Pingvin',  body:'#2b2d42', ear:'#f1c40f', pattern:'#ecf0f1', eyeType:'round', emoji:'🐧' },
   owl:      { name:'Ugle',     body:'#8b5a2b', ear:'#cd853f', pattern:'#f5deb3', eyeType:'round', emoji:'🦉' },
   phoenix:  { name:'Føniks',   body:'#ff6b35', ear:'#ffd23f', pattern:'#c81d25', eyeType:'slit',  emoji:'🔥', bodyPlan:'phoenix' },
@@ -639,18 +639,16 @@ function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
 }
 
 function drawLimbs(ctx, speciesKey, colors, profile, bodyY, asleep) {
-  const isTurtleAsleep = speciesKey === 'turtle' && asleep;
   if (speciesKey === 'penguin' || speciesKey === 'owl') {
     ctx.fillStyle = colors.ear; [-1, 1].forEach(dir => { ctx.beginPath(); ctx.ellipse(dir * profile.bodyRX * 0.5, bodyY + profile.bodyRY * 0.9, 10, 6, 0, 0, Math.PI * 2); ctx.fill(); });
     ctx.fillStyle = (speciesKey === 'penguin') ? colors.body : colors.pattern;
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * profile.bodyRX * 0.9, bodyY - profile.bodyRY * 0.2); ctx.rotate(dir * 0.5); ctx.beginPath(); ctx.ellipse(0, 15, 8, 25, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }); return;
   }
-  if (isTurtleAsleep) return;
   const limbColor = (speciesKey === 'panda' || speciesKey === 'redpanda') ? '#2a2a2a' : colors.body;
   const pawColor = (speciesKey === 'panda' || speciesKey === 'redpanda') ? '#1a1a1a' : 'rgba(255,255,255,0.4)';
   [-1, 1].forEach(dir => {
     ctx.beginPath(); ctx.ellipse(dir * profile.bodyRX * 0.7, bodyY + profile.bodyRY * 0.7, 12, 16, dir * 0.3, 0, Math.PI * 2); ctx.fillStyle = limbColor; ctx.fill();
-    if(speciesKey !== 'turtle') { ctx.beginPath(); ctx.ellipse(dir * profile.bodyRX * 0.75, bodyY + profile.bodyRY * 0.7 + 12, 14, 8, 0, 0, Math.PI * 2); ctx.fillStyle = pawColor; ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse(dir * profile.bodyRX * 0.75, bodyY + profile.bodyRY * 0.7 + 12, 14, 8, 0, 0, Math.PI * 2); ctx.fillStyle = pawColor; ctx.fill();
   });
   [-1, 1].forEach(dir => { ctx.beginPath(); ctx.ellipse(dir * profile.bodyRX * 0.8, bodyY - profile.bodyRY * 0.1, 10, 20, dir * 0.5, 0, Math.PI * 2); ctx.fillStyle = limbColor; ctx.fill(); });
 }
@@ -781,9 +779,10 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if(sp.bodyPlan==='dragon') return drawDragonCreature(ctx, baseSpecies, stage, opts);
   if(sp.bodyPlan==='panda') return drawPandaCreature(ctx, baseSpecies, stage, opts);
   if(sp.bodyPlan==='unicorn') return drawUnicornCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='turtle') return drawTurtleCreature(ctx, baseSpecies, stage, opts);
 
   const profile = STAGE_PROFILE[stage], baseScale = STAGE_SCALE[stage] * 120, sad = opts.sad, asleep = opts.asleep, pacifier = opts.pacifier, action = opts.action, yaw = opts.yaw || 0;
-  const isBird = baseSpecies === 'penguin' || baseSpecies === 'owl'; const isTurtleAsleep = baseSpecies === 'turtle' && asleep;
+  const isBird = baseSpecies === 'penguin' || baseSpecies === 'owl';
   let extraTX=0, extraTY=0, extraRotate=0, extraScaleX=1, extraScaleY=1, chompProgress = null;
 
   if(action && action.type==='play'){ const t = getPlayTransform(action.variant, action.progress); extraTX=t.translateX||0; extraTY=t.translateY||0; extraRotate=t.rotate||0; extraScaleX=t.scaleX||1; extraScaleY=t.scaleY||1; } 
@@ -821,7 +820,6 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   }
 
   ctx.save(); ctx.translate(0, profile.bodyY);
-  if (baseSpecies === 'turtle') { ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(0, 0, profile.bodyRX*1.3, profile.bodyRY*1.2, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = colors.ear; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, 0, profile.bodyRX*0.9, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.stroke(); }
   const tailSpecies = speciesKey === 'hybrid' && opts.hybridDNA ? opts.hybridDNA.tail : baseSpecies; drawTail(ctx, tailSpecies, colors, profile, stage); ctx.restore();
 
   drawLimbs(ctx, baseSpecies, colors, profile, profile.bodyY, asleep);
@@ -837,10 +835,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   } else if (baseSpecies === 'penguin' || baseSpecies === 'owl') {
     ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
     ctx.fillStyle = colors.pattern; ctx.fill(); 
-  } else if (baseSpecies === 'turtle') { 
-    ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.8, profile.bodyRY*0.8, 0, 0, Math.PI*2); 
-    ctx.fillStyle = '#e5d38a'; ctx.fill(); 
-  } else { 
+  } else {
     ctx.beginPath(); ctx.ellipse(0, profile.bodyY + profile.bodyRY*0.1, profile.bodyRX*0.7, profile.bodyRY*0.75, 0, 0, Math.PI*2); 
     ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.fill(); 
   }
@@ -848,7 +843,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if(baseSpecies === 'cheetah' && profile.features) { ctx.fillStyle = colors.pattern; [[-10,-10], [15,-5], [-12,5], [10,12], [0,-2]].forEach(([sx,sy]) => { ctx.beginPath(); ctx.arc(sx, profile.bodyY + sy, 2.5, 0, Math.PI*2); ctx.fill(); }); }
 
   const equipped = opts.equipped; if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, 0, profile.bodyY - profile.bodyRY*0.6);
-  const turtleSleepShift = isTurtleAsleep ? 12 : 0; ctx.save(); ctx.translate(0, turtleSleepShift);
+  ctx.save();
 
   const earSpecies = speciesKey === 'hybrid' && opts.hybridDNA ? opts.hybridDNA.ears : baseSpecies; drawEars(ctx, earSpecies, colors, profile, stage);
   ctx.beginPath(); ctx.arc(0, 0, profile.headR, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
@@ -961,43 +956,116 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
   const sp = SPECIES[baseSpecies] || SPECIES['snake']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
   const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
-  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep); 
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
   const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*3;
 
-  ctx.save(); ctx.translate(180+t.extraTX, 215+bounce+t.extraTY); 
+  ctx.save(); ctx.translate(180+t.extraTX, 210+bounce+t.extraTY);
   if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
   ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
-  
-  if (opts.prestige > 0) {
-    const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
-    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,50,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige === 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else if(opts.prestige >= 4) { a1 = `hsla(${(bounceTime*60)%360},100%,55%,0.8)`; a2 = 'rgba(0,0,0,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
-    grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
-  }
 
-  const coil = { baby:0.32, child:0.55, teen:0.78, adult:1.0 }[stage];
-  const bodyPts = [ { x:-95*coil, y:14, r:5+3*coil }, { x:-58*coil, y:-16*coil, r:9+5*coil }, { x:-18*coil, y:12*coil, r:13+7*coil }, { x:22*coil,  y:-14*coil, r:12+6*coil }, { x:55*coil,  y:8*coil,   r:9+4*coil } ];
+  drawPrestigeAura(ctx, 5, 95, opts.prestige || 0);
+
+  const slither = asleep ? 0 : Math.sin(bounceTime*2.2)*6;
+  const coil = { baby:0.4, child:0.62, teen:0.82, adult:1.0 }[stage];
+  const bodyPts = [
+    { x:-98*coil, y:16+slither*0.2, r:4+2*coil },
+    { x:-72*coil, y:-8-slither*0.5, r:8+4*coil },
+    { x:-42*coil, y:16+slither, r:12+6*coil },
+    { x:-12*coil, y:-10-slither*0.7, r:14+7*coil },
+    { x:18*coil,  y:10+slither*0.5, r:13+6*coil },
+    { x:44*coil,  y:-8-slither*0.3, r:10+5*coil },
+  ];
   drawTaperedPath(ctx, bodyPts, colors.body);
   ctx.fillStyle = colors.pattern;
-  for(let i=0;i<bodyPts.length-1;i++){ const a=bodyPts[i], b=bodyPts[i+1]; const mx=(a.x+b.x)/2, my=(a.y+b.y)/2, mr=(a.r+b.r)/2; ctx.save(); ctx.translate(mx,my); ctx.rotate(Math.PI/4); ctx.fillRect(-mr*0.4,-mr*0.4,mr*0.8,mr*0.8); ctx.restore(); }
+  for(let i=1;i<bodyPts.length;i+=2){ const p=bodyPts[i]; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Math.PI/4); ctx.fillRect(-p.r*0.4,-p.r*0.4,p.r*0.8,p.r*0.8); ctx.restore(); }
 
-  const headX = 68*coil+18, headY = -2*coil; const headR = 15+4*coil;
-  ctx.beginPath(); ctx.ellipse(headX, headY, headR, headR*0.85, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
+  if(!asleep){
+    const hood = Math.max(0, Math.sin(bounceTime*0.7));
+    if(hood > 0.6){
+      const hp = (hood-0.6)/0.4; const hx = 54*coil, hy = -6;
+      ctx.save(); ctx.globalAlpha = hp*0.85; ctx.fillStyle = colors.body;
+      ctx.beginPath(); ctx.moveTo(hx,hy); ctx.quadraticCurveTo(hx+10,hy-16-hp*8,hx+24,hy-6-hp*4); ctx.quadraticCurveTo(hx+14,hy+2,hx+8,hy+8); ctx.quadraticCurveTo(hx+16,hy+6-hp,hx+18,hy+2-hp*8); ctx.quadraticCurveTo(hx+4,hy+6,hx,hy); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
 
-  const closedEyes = asleep; const eyeY2 = headY-3, eyeDX2 = headR*0.5;
-  if(closedEyes){ ctx.strokeStyle='#2a2a1a'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(headX+eyeDX2-5,eyeY2); ctx.quadraticCurveTo(headX+eyeDX2,eyeY2+4,headX+eyeDX2+5,eyeY2); ctx.stroke(); } 
-  else { ctx.beginPath(); ctx.arc(headX+eyeDX2, eyeY2, headR*0.24, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.beginPath(); ctx.arc(headX+eyeDX2+1, eyeY2+ (annoyed?2:0), headR*0.14, 0, Math.PI*2); ctx.fillStyle='#2a2a2a'; ctx.fill(); }
-  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(headX+eyeDX2-6,eyeY2-8); ctx.lineTo(headX+eyeDX2+6,eyeY2-4); ctx.stroke(); }
+  const headX = 62*coil+16, headY = -2; const headR = 13+4*coil;
+  ctx.save(); ctx.translate(headX, headY); ctx.rotate(0.12);
+  ctx.beginPath(); ctx.ellipse(0,0,headR*1.15,headR*0.78,0,0,Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
+  ctx.restore();
 
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(headX+headR*0.75, headY-2, 1.4, 0, Math.PI*2); ctx.fill();
+  const closedEyes = asleep; const eyeX = headX+headR*0.5, eyeY2 = headY-headR*0.35;
+  if(closedEyes){ ctx.strokeStyle='#2a2a1a'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(eyeX-5,eyeY2); ctx.quadraticCurveTo(eyeX,eyeY2+4,eyeX+5,eyeY2); ctx.stroke(); }
+  else {
+    ctx.beginPath(); ctx.ellipse(eyeX,eyeY2,headR*0.26,headR*0.3,0,0,Math.PI*2); ctx.fillStyle = sp.eyeType==='slit' ? '#ffd23f' : '#fff'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(eyeX+(annoyed?0:0.6), eyeY2, headR*0.08, headR*0.24, 0, 0, Math.PI*2); ctx.fillStyle='#1a1208'; ctx.fill();
+  }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(eyeX-6,eyeY2-8); ctx.lineTo(eyeX+6,eyeY2-4); ctx.stroke(); }
 
-  const mouthX = headX+8; const mouthY = headY+8;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.arc(headX+headR*0.85, headY-2, 1.4, 0, Math.PI*2); ctx.fill();
+
+  const mouthX = headX+headR*0.6; const mouthY = headY+headR*0.55;
   ctx.strokeStyle='#2a2a1a'; ctx.lineWidth=1.6; ctx.lineCap='round'; ctx.beginPath();
   if(asleep){ ctx.moveTo(headX+3,mouthY+1); ctx.lineTo(headX+11,mouthY+1); } else if(annoyed){ ctx.moveTo(headX+2,mouthY+3); ctx.quadraticCurveTo(headX+8,mouthY-2,headX+14,mouthY+1); } else { ctx.moveTo(headX+2,mouthY); ctx.quadraticCurveTo(headX+8,mouthY+4,headX+14,mouthY); } ctx.stroke();
-  if(!asleep && !annoyed && Math.sin(bounceTime*2.6) > 0.65){ ctx.strokeStyle='#c73c5a'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(headX+headR*0.95, headY+6); ctx.lineTo(headX+headR*1.35, headY+6); ctx.lineTo(headX+headR*1.55, headY+2); ctx.moveTo(headX+headR*1.35, headY+6); ctx.lineTo(headX+headR*1.55, headY+10); ctx.stroke(); }
-  if (opts.prestige >= 3 && !asleep) { ctx.save(); const haloY = headY - headR - 10 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = opts.prestige >= 4 ? `hsla(${(bounceTime*60)%360},100%,60%,0.85)` : 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(headX, haloY, headR * 0.8, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  if(!asleep && !annoyed && Math.sin(bounceTime*2.6) > 0.65){ ctx.strokeStyle='#c73c5a'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(headX+headR*1.05, headY+4); ctx.lineTo(headX+headR*1.45, headY+4); ctx.lineTo(headX+headR*1.65, headY); ctx.moveTo(headX+headR*1.45, headY+4); ctx.lineTo(headX+headR*1.65, headY+8); ctx.stroke(); }
 
+  drawPrestigeHalo(ctx, headY-headR-10, headR*0.8, 5, opts.prestige || 0);
   drawReptileActionOverlays(ctx, baseSpecies, opts, t, headX, headY, headR, mouthX, mouthY); ctx.restore();
+}
+
+function drawTurtleCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['turtle']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*1.2)*2;
+  const ext = asleep ? 0.2 : 1;
+
+  ctx.save(); ctx.translate(180+t.extraTX, 205+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, 0, 100, opts.prestige || 0);
+
+  [[-32,18],[32,18],[-30,48],[30,48]].forEach(([lx,ly])=>{
+    ctx.save(); ctx.globalAlpha = 0.25+0.75*ext; ctx.translate(lx*ext, ly);
+    ctx.beginPath(); ctx.ellipse(0,0,12,9,0,0,Math.PI*2); ctx.fillStyle=colors.pattern; ctx.fill();
+    ctx.fillStyle=colors.ear; for(let c=-1;c<=1;c++){ ctx.beginPath(); ctx.arc(c*4, 7, 2, 0, Math.PI*2); ctx.fill(); }
+    ctx.restore();
+  });
+
+  ctx.save(); ctx.globalAlpha = 0.25+0.75*ext;
+  ctx.beginPath(); ctx.moveTo(0,52); ctx.lineTo(-6*ext,68); ctx.lineTo(6*ext,68); ctx.closePath(); ctx.fillStyle=colors.pattern; ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath(); ctx.ellipse(0,28,48,38,0,0,Math.PI*2); ctx.fillStyle=colors.pattern; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,28,40,31,0,0,Math.PI*2); ctx.fillStyle=colors.body; ctx.fill();
+  ctx.strokeStyle=colors.pattern; ctx.lineWidth=2;
+  [[0,4],[-20,22],[20,22],[0,26],[-18,44],[18,44],[0,50]].forEach(([sx,sy])=>{
+    ctx.save(); ctx.translate(sx,sy); ctx.beginPath();
+    for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; const px=Math.cos(a)*9, py=Math.sin(a)*7; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    ctx.closePath(); ctx.stroke(); ctx.restore();
+  });
+
+  ctx.save(); ctx.globalAlpha = 0.3+0.7*ext;
+  drawTaperedPath(ctx, [ {x:38*ext, y:4, r:11}, {x:52*ext, y:-6, r:9} ], colors.body);
+
+  const headCX = 60*ext, headCY = -10*ext, headR = 12;
+  ctx.beginPath(); ctx.ellipse(headCX, headCY, headR, headR*0.85, 0, 0, Math.PI*2); ctx.fillStyle=colors.body; ctx.fill();
+
+  const closedEyes = asleep; const eyeCX = headCX+3, eyeCY = headCY-3;
+  if(closedEyes){ ctx.strokeStyle='#2d4c2b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(eyeCX-4,eyeCY); ctx.quadraticCurveTo(eyeCX,eyeCY+3,eyeCX+4,eyeCY); ctx.stroke(); }
+  else { ctx.beginPath(); ctx.arc(eyeCX,eyeCY,4,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.beginPath(); ctx.arc(eyeCX+(annoyed?0:0.8),eyeCY,2.2,0,Math.PI*2); ctx.fillStyle='#2d4c2b'; ctx.fill(); }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(eyeCX-5,eyeCY-7); ctx.lineTo(eyeCX+4,eyeCY-4); ctx.stroke(); }
+
+  ctx.strokeStyle='#2d4c2b'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.beginPath();
+  if(annoyed){ ctx.moveTo(headCX-4,headCY+8); ctx.quadraticCurveTo(headCX+2,headCY+4,headCX+8,headCY+7); } else { ctx.moveTo(headCX-4,headCY+6); ctx.quadraticCurveTo(headCX+2,headCY+10,headCX+8,headCY+6); }
+  ctx.stroke();
+  ctx.restore();
+
+  drawPrestigeHalo(ctx, headCY-18, 14, 5, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, headCX, headCY, headR, headCX+9, headCY+7);
+  ctx.restore();
 }
 
 function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
