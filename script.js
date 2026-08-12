@@ -13,7 +13,6 @@ const SPECIES = {
   monkey:   { name:'Ape',      body:'#8d6e63', ear:'#f4b183', pattern:'#d7ccc8', eyeType:'round', emoji:'🐒' },
   unicorn:  { name:'Enhjørning', body:'#f8f9fa', ear:'#ffb6c1', pattern:'#a29bfe', eyeType:'round', emoji:'🦄' },
   pig:      { name:'Gris',     body:'#ffb8c6', ear:'#f48fb1', pattern:'#ff9eaf', eyeType:'round', emoji:'🐷' },
-  axolotl:  { name:'Axolotl',  body:'#ffb8c6', ear:'#ff477e', pattern:'#ff769b', eyeType:'round', emoji:'🦎', bodyPlan:'gecko' },
   fennec:   { name:'Fennek',   body:'#f5deb3', ear:'#e6c280', pattern:'#8b5a2b', eyeType:'slit',  emoji:'🦊' },
   cheetah:  { name:'Gepard',   body:'#f1c40f', ear:'#d35400', pattern:'#2a2a2a', eyeType:'round', emoji:'🐆' },
   lemur:    { name:'Lemur',    body:'#aeb6bf', ear:'#7f8c8d', pattern:'#2a2a2a', eyeType:'round', emoji:'🐒' },
@@ -21,6 +20,13 @@ const SPECIES = {
   turtle:   { name:'Skilpadde',body:'#7fb87a', ear:'#4d8549', pattern:'#2d4c2b', eyeType:'round', emoji:'🐢' },
   penguin:  { name:'Pingvin',  body:'#2b2d42', ear:'#f1c40f', pattern:'#ecf0f1', eyeType:'round', emoji:'🐧' },
   owl:      { name:'Ugle',     body:'#8b5a2b', ear:'#cd853f', pattern:'#f5deb3', eyeType:'round', emoji:'🦉' },
+  phoenix:  { name:'Føniks',   body:'#ff6b35', ear:'#ffd23f', pattern:'#c81d25', eyeType:'slit',  emoji:'🔥', bodyPlan:'phoenix' },
+  robot:    { name:'Robot',    body:'#9aa5b1', ear:'#00e5ff', pattern:'#37474f', eyeType:'round', emoji:'🤖', bodyPlan:'robot' },
+  alien:    { name:'Alien',    body:'#9be15d', ear:'#bd6fff', pattern:'#3f8f3f', eyeType:'round', emoji:'👽', bodyPlan:'alien' },
+  slime:    { name:'Slim',     body:'#37e58c', ear:'#1fae67', pattern:'#0c7a45', eyeType:'round', emoji:'🟢', bodyPlan:'blob' },
+  yeti:     { name:'Yeti',     body:'#eaf6ff', ear:'#b3e5fc', pattern:'#5c8aa8', eyeType:'round', emoji:'❄️', bodyPlan:'yeti' },
+  golem:    { name:'Krystallgolem', body:'#8ec9e8', ear:'#c9a6ff', pattern:'#4a3a7a', eyeType:'round', emoji:'💎', bodyPlan:'golem' },
+  kraken:   { name:'Krake',    body:'#4a3a7a', ear:'#7a3ab8', pattern:'#2a1a4a', eyeType:'slit',  emoji:'🐙', bodyPlan:'kraken' },
   hybrid:   { name:'Mytisk Hybrid', body:'#ffffff', ear:'#ffffff', pattern:'#ffffff', eyeType:'round', emoji:'✨' }
 };
 
@@ -72,9 +78,10 @@ const LAST_INCOME_KEY = 'petgame_last_income_ts';
 const PASSIVE_INCOME_PER_HOUR = 6;
 const INCOME_CHECK_INTERVAL = 60000;
 
-const FOOD_EMOJI = { 
-  cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗', lion:'🥩', monkey:'🍌', 
-  unicorn:'🧁', pig:'🍎', axolotl:'🦐', fennek:'🦂', cheetah:'🥩', lemur:'🍉', redpanda:'🍇', turtle:'🥬', penguin:'🐟', owl:'🐁', hybrid:'🌟'
+const FOOD_EMOJI = {
+  cat:'🐟', dog:'🦴', fox:'🍗', panda:'🎋', dragon:'🍖', bunny:'🥕', snake:'🐁', gecko:'🦗', lion:'🥩', monkey:'🍌',
+  unicorn:'🧁', pig:'🍎', fennec:'🦂', cheetah:'🥩', lemur:'🍉', redpanda:'🍇', turtle:'🥬', penguin:'🐟', owl:'🐁',
+  phoenix:'🌶️', robot:'🔋', alien:'🧪', slime:'🍬', yeti:'🍧', golem:'💠', kraken:'🐟', hybrid:'🌟'
 };
 
 const FULL_HUNGER_THRESHOLD = 92;
@@ -167,7 +174,7 @@ if (!state || typeof state !== 'object') state = defaultState();
 
 let audioCtx = null, animFrame = 0, eggShakeCount = 0, eggWobble = 0, selectedSpecies = null;
 let currentAction = null, growthPulseUntil = 0, petYaw = 0, petYawTarget = 0, isDraggingPet = false, dragStartX = 0, dragStartYaw = 0, currentMeetupPets = [];
-let lastStageSeen = null, blinkPhase = 0, bounceTime = 0, toastTimer = null, lastEnvUpdate = 0, lastNonSlotScreen = 'select', wakeLock = null, lastIncomeTick = 0;
+let lastStageSeen = null, blinkPhase = 0, bounceTime = 0, toastTimer = null, lastEnvUpdate = 0, lastNonSlotScreen = 'select', wakeLock = null, lastIncomeTick = 0, nextIdleReactionAt = 0;
 
 /* ---------- DOM refs ---------- */
 const el = {
@@ -683,9 +690,6 @@ function drawEars(ctx, speciesKey, colors, profile, stage){
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.ellipse(dir * 4, -25, 10, 36, dir * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(dir * 4, -24, 4.5, 26, dir * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.fillStyle = colors.ear; });
   } else if (speciesKey === 'dragon') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.6, -r * 0.75); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 5); ctx.lineTo(dir * 10, -22); ctx.lineTo(dir * -6, -8); ctx.closePath(); ctx.fillStyle = colors.body; ctx.fill(); ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.moveTo(dir * 2, 0); ctx.lineTo(dir * 7, -15); ctx.lineTo(dir * -2, -6); ctx.closePath(); ctx.fill(); ctx.restore(); });
-  } else if (speciesKey === 'axolotl') {
-    ctx.strokeStyle = colors.ear; ctx.lineWidth = 4 * s; ctx.lineCap = 'round';
-    [-1, 1].forEach(dir => { for(let i=0;i<3;i++){ ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.35 + i * 8 * s); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(dir * 14, -6, dir * 20, 2); ctx.stroke(); ctx.restore(); } });
   } else if (speciesKey === 'turtle') {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.85, -r * 0.35); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.restore(); });
   } else if (speciesKey === 'penguin') {
@@ -693,6 +697,30 @@ function drawEars(ctx, speciesKey, colors, profile, stage){
   } else if (speciesKey === 'snake' || speciesKey === 'gecko') {
     ctx.fillStyle = colors.pattern;
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.7); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 8, -14); ctx.lineTo(dir * -4, -4); ctx.closePath(); ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'phoenix') {
+    ctx.fillStyle = colors.ear;
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.35, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 10); ctx.quadraticCurveTo(dir * 10, -15, dir * 4, -32); ctx.quadraticCurveTo(dir * -4, -15, 0, 10); ctx.closePath(); ctx.fill(); ctx.restore(); });
+    ctx.fillStyle = colors.pattern;
+    ctx.save(); ctx.translate(0, -r * 0.95); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 8); ctx.quadraticCurveTo(6, -20, 0, -38); ctx.quadraticCurveTo(-6, -20, 0, 8); ctx.closePath(); ctx.fill(); ctx.restore();
+  } else if (speciesKey === 'robot') {
+    ctx.strokeStyle = colors.pattern; ctx.lineWidth = 3 * s; ctx.lineCap = 'round';
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.5, -r * 0.85); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dir * 6, -22); ctx.stroke(); ctx.beginPath(); ctx.arc(dir * 6, -22, 5, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'alien') {
+    ctx.strokeStyle = colors.body; ctx.lineWidth = 3 * s; ctx.lineCap = 'round';
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.35, -r * 0.9); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(dir * 14, -10, dir * 10, -26); ctx.stroke(); ctx.beginPath(); ctx.arc(dir * 10, -26, 5, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'slime') {
+    ctx.globalAlpha = 0.85;
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.5); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0, -4, 10, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.restore(); });
+    ctx.globalAlpha = 1;
+  } else if (speciesKey === 'yeti') {
+    ctx.fillStyle = colors.ear;
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.7, -r * 0.6); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(dir * 10, -20); ctx.lineTo(dir * -6, -4); ctx.closePath(); ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'golem') {
+    ctx.fillStyle = colors.ear; ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.6); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(dir * 8, -6); ctx.lineTo(0, -24); ctx.lineTo(dir * -8, -6); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); });
+  } else if (speciesKey === 'kraken') {
+    ctx.strokeStyle = colors.ear; ctx.lineWidth = 5 * s; ctx.lineCap = 'round';
+    [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.6, -r * 0.3); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(dir * 20, -10, dir * -10, -25, dir * 15, -35); ctx.stroke(); ctx.restore(); });
   } else {
     [-1, 1].forEach(dir => { ctx.save(); ctx.translate(dir * r * 0.75, -r * 0.55); ctx.scale(s, s); ctx.beginPath(); ctx.arc(0, -6, 11, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.beginPath(); ctx.arc(dir * 1.5, -6, 5.5, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill(); ctx.restore(); });
   }
@@ -718,8 +746,22 @@ function drawTail(ctx, speciesKey, colors, profile, stage){
   } else if (speciesKey === 'panda') { ctx.translate(bx * 0.85, by * 0.4); ctx.scale(s, s); ctx.beginPath(); ctx.arc(5, 0, 9, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
   } else if (speciesKey === 'bunny') { ctx.translate(bx * 0.85, by * 0.3); ctx.scale(s, s); ctx.beginPath(); ctx.arc(5, 0, 10, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
   } else if (speciesKey === 'fennec') { ctx.translate(bx * 0.85, by * 0.15); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(26, 10, 32, -14); ctx.lineWidth = 9; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke(); ctx.beginPath(); ctx.arc(32, -14, 6, 0, Math.PI * 2); ctx.fillStyle = '#fff8ee'; ctx.fill();
-  } else if (speciesKey === 'axolotl') { ctx.translate(bx * 0.8, by * 0.3); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, -10); ctx.quadraticCurveTo(20, -5, 28, 10); ctx.quadraticCurveTo(14, 8, 0, 18); ctx.closePath(); ctx.fillStyle = colors.pattern; ctx.fill();
   } else if (speciesKey === 'snake' || speciesKey === 'gecko') { ctx.translate(bx * 0.85, by * 0.35); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20, 8, 26, 26); ctx.lineWidth = 7; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke();
+  } else if (speciesKey === 'phoenix') {
+    ctx.translate(bx * 0.85, by * 0.1); ctx.scale(s, s); ctx.fillStyle = colors.ear;
+    [-1, 0, 1].forEach((dir, i) => { ctx.save(); ctx.rotate(dir * 0.35); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(30, 10 + i * 4, 42 - i * 3, -6 + dir * 20); ctx.quadraticCurveTo(25, 5, 0, 0); ctx.closePath(); ctx.fill(); ctx.restore(); });
+  } else if (speciesKey === 'robot') {
+    ctx.translate(bx * 0.85, by * 0.15); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(32, 4); ctx.lineWidth = 6; ctx.strokeStyle = colors.pattern; ctx.lineCap = 'round'; ctx.stroke(); ctx.beginPath(); ctx.arc(32, 4, 5, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill();
+  } else if (speciesKey === 'alien') {
+    ctx.translate(bx * 0.85, by * 0.15); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(20, 20, 10, 36); ctx.lineWidth = 5; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke(); ctx.beginPath(); ctx.arc(10, 36, 4, 0, Math.PI * 2); ctx.fillStyle = colors.ear; ctx.fill();
+  } else if (speciesKey === 'slime') {
+    ctx.translate(bx * 0.8, by * 0.3); ctx.scale(s, s); ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(10, 10, 16, 12, 0, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill(); ctx.globalAlpha = 1;
+  } else if (speciesKey === 'yeti') {
+    ctx.translate(bx * 0.85, by * 0.2); ctx.scale(s, s); ctx.beginPath(); ctx.arc(10, 10, 14, 0, Math.PI * 2); ctx.fillStyle = colors.body; ctx.fill();
+  } else if (speciesKey === 'golem') {
+    ctx.translate(bx * 0.85, by * 0.15); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(24, -8); ctx.lineTo(34, 10); ctx.lineTo(16, 18); ctx.closePath(); ctx.fillStyle = colors.pattern; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+  } else if (speciesKey === 'kraken') {
+    ctx.translate(bx * 0.85, by * 0.2); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(20, 10, 10, 30, 30, 36); ctx.lineWidth = 8; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke();
   } else { ctx.translate(bx * 0.85, by * 0.2); ctx.scale(s, s); ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(24, 10, 30, 26); ctx.lineWidth = 8; ctx.strokeStyle = colors.body; ctx.lineCap = 'round'; ctx.stroke(); }
   ctx.restore();
 }
@@ -729,7 +771,14 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   const sp = SPECIES[baseSpecies] || SPECIES['cat']; const colors = opts.colors || sp;
   if(sp.bodyPlan==='snake') return drawSnakeCreature(ctx, baseSpecies, stage, opts);
   if(sp.bodyPlan==='gecko') return drawGeckoCreature(ctx, baseSpecies, stage, opts);
-  
+  if(sp.bodyPlan==='blob') return drawSlimeCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='alien') return drawAlienCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='robot') return drawRobotCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='golem') return drawGolemCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='kraken') return drawKrakenCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='yeti') return drawYetiCreature(ctx, baseSpecies, stage, opts);
+  if(sp.bodyPlan==='phoenix') return drawPhoenixCreature(ctx, baseSpecies, stage, opts);
+
   const profile = STAGE_PROFILE[stage], baseScale = STAGE_SCALE[stage] * 120, sad = opts.sad, asleep = opts.asleep, pacifier = opts.pacifier, action = opts.action, yaw = opts.yaw || 0;
   const isBird = baseSpecies === 'penguin' || baseSpecies === 'owl'; const isTurtleAsleep = baseSpecies === 'turtle' && asleep;
   let extraTX=0, extraTY=0, extraRotate=0, extraScaleX=1, extraScaleY=1, chompProgress = null;
@@ -753,7 +802,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   if (opts.prestige >= 1) {
     const auraR = profile.bodyRX * 2.2 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, profile.bodyY, auraR * 0.3, 0, profile.bodyY, auraR);
     let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige === 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else if(opts.prestige >= 4) { a1 = `hsla(${(bounceTime*60)%360},100%,55%,0.8)`; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, profile.bodyY, auraR, 0, Math.PI * 2); ctx.fill();
   }
   if (opts.prestige >= 2 && !asleep) {
@@ -772,8 +821,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     ctx.save(); ctx.translate(0, profile.bodyY); ctx.scale(profile.tailScale, profile.tailScale);
     [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*20, -10); ctx.quadraticCurveTo(dir*90,-40,dir*70,20); ctx.quadraticCurveTo(dir*55,10,dir*20,-10); ctx.closePath(); ctx.fillStyle='rgba(127,216,160,0.55)'; ctx.fill(); ctx.strokeStyle='rgba(79,174,116,0.6)'; ctx.lineWidth=1.5; ctx.stroke(); }); ctx.restore();
   }
-
-  ctx.save(); ctx.translate(0, profile.bodyY); 
+  ctx.save(); ctx.translate(0, profile.bodyY);
   if (baseSpecies === 'turtle') { ctx.fillStyle = colors.pattern; ctx.beginPath(); ctx.ellipse(0, 0, profile.bodyRX*1.3, profile.bodyRY*1.2, 0, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = colors.ear; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, 0, profile.bodyRX*0.9, profile.bodyRY*0.8, 0, 0, Math.PI*2); ctx.stroke(); }
   const tailSpecies = speciesKey === 'hybrid' && opts.hybridDNA ? opts.hybridDNA.tail : baseSpecies; drawTail(ctx, tailSpecies, colors, profile, stage); ctx.restore();
 
@@ -835,7 +883,7 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
   } else {
     [-1,1].forEach(dir=>{
       ctx.beginPath();
-      if(sp.eyeType==='slit'){ ctx.ellipse(dir*eyeDX, eyeY, eyeR, eyeR*1.28, 0, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.fillStyle='#2a2a2a'; ctx.fillRect(dir*eyeDX-1.5, eyeY-eyeR*0.85, 3, eyeR*1.7); } 
+      if(sp.eyeType==='slit'){ ctx.ellipse(dir*eyeDX, eyeY, eyeR, eyeR*1.28, 0, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.fillStyle='#2a2a2a'; ctx.fillRect(dir*eyeDX-1.5, eyeY-eyeR*0.85, 3, eyeR*1.7); }
       else { ctx.arc(dir*eyeDX, eyeY, eyeR, 0, Math.PI*2); ctx.fillStyle = baseSpecies === 'lemur' ? '#f1c40f' : '#fff'; ctx.fill(); ctx.beginPath(); ctx.arc(dir*eyeDX + (annoyed?0:1), eyeY+ (annoyed?2:1), eyeR*0.57, 0, Math.PI*2); ctx.fillStyle='#2a2a2a'; ctx.fill(); }
     });
   }
@@ -854,16 +902,35 @@ function drawCreature(ctx, speciesKey, stage, opts={}){
     if(baseSpecies==='bunny' && !annoyed && !asleep && profile.features){ ctx.fillStyle='#fff'; ctx.fillRect(-4,13,3.5,6); ctx.fillRect(0.5,13,3.5,6); ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=0.5; ctx.strokeRect(-4,13,3.5,6); ctx.strokeRect(0.5,13,3.5,6); }
   }
   ctx.fillStyle='rgba(255,120,140,0.35)'; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*24, 10, 6, 0, Math.PI*2); ctx.fill(); });
-  ctx.restore(); 
+
+  if(baseSpecies==='dragon' && !asleep && profile.features){
+    const bp = (bounceTime*0.5) % 1;
+    if(bp < 0.35){ const p = bp/0.35; ctx.save(); ctx.globalAlpha = (1-p)*0.85; ctx.fillStyle = `rgba(255,${120+Math.floor(p*80)},40,1)`; ctx.beginPath(); ctx.arc(16, 12-p*14, 3+p*4, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  }
+  if(baseSpecies==='unicorn' && !asleep && profile.features){
+    const tw = Math.sin(bounceTime*3);
+    if(tw > 0.55){ ctx.save(); ctx.globalAlpha = tw; ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(0, -profile.headR*1.55, 2.5, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  }
+  if(baseSpecies==='cat' && !asleep && !annoyed && Math.sin(bounceTime*1.5) > 0.9){
+    ctx.save(); ctx.globalAlpha = 0.7; ctx.fillStyle='rgba(180,120,255,0.8)'; ctx.font='10px sans-serif'; ctx.fillText('♪', 20, -6); ctx.restore();
+  }
+  if(baseSpecies==='bunny' && !asleep && profile.features){
+    const twitch = Math.sin(bounceTime*10)*0.5+0.5;
+    ctx.save(); ctx.fillStyle='rgba(255,180,190,0.6)'; ctx.beginPath(); ctx.ellipse(0, 6, 2+twitch*0.8, 1.5, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
+  ctx.restore();
 
   if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, 0, -profile.headR + 6, eyeDX, 1);
   ctx.restore(); 
 
   if (opts.prestige >= 3 && !asleep) {
-    ctx.save(); const haloY = -profile.headR - 15 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(0, haloY, profile.headR * 0.6, 8, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    ctx.save(); const haloY = -profile.headR - 15 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = opts.prestige >= 4 ? `hsla(${(bounceTime*60)%360},100%,60%,0.85)` : 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(0, haloY, profile.headR * 0.6, 8, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  if (opts.prestige >= 5 && !asleep) {
+    ctx.save(); const t2 = bounceTime * 3; for(let i=0;i<3;i++){ const ang = t2 + (i/3)*Math.PI*2; const px = Math.sin(ang)*profile.bodyRX*1.5, py = profile.bodyY + Math.cos(ang)*profile.bodyRY*1.5; ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fillStyle = `hsla(${(ang*60)%360},100%,65%,0.9)`; ctx.fill(); } ctx.restore();
   }
 
-  if(action && action.type==='eat'){ if(chompProgress<1){ const foodScale = 1-chompProgress*0.7; drawEmojiOverlay(ctx, FOOD_EMOJI[baseSpecies] || '🍎', 30, 4, 30*foodScale, 1); } } 
+  if(action && action.type==='eat'){ if(chompProgress<1){ const foodScale = 1-chompProgress*0.7; drawEmojiOverlay(ctx, FOOD_EMOJI[baseSpecies] || '🍎', 30, 4, 30*foodScale, 1); } }
   else if(action && action.type==='refuse'){ drawEmojiOverlay(ctx, FOOD_EMOJI[baseSpecies] || '🍎', 34+action.progress*18, 4, 26, 1-action.progress*0.7); } 
   else if(action && action.type==='wash'){ const p = action.progress; const sudsEnv = Math.sin(Math.min(p/0.85,1)*Math.PI); ctx.fillStyle = 'rgba(255,255,255,0.75)'; [[-18,-4,10],[10,-12,12],[20,8,9],[-6,16,8],[2,-2,14]].forEach(([sx,sy,sr],i)=>{ ctx.beginPath(); ctx.arc(sx, sy, sr*sudsEnv*(0.7+0.3*Math.sin(p*10+i)), 0, Math.PI*2); ctx.fill(); }); drawEmojiOverlay(ctx, '🧽', Math.sin(p*Math.PI*6)*30, 4, 26, 1); } 
   else if(action && action.type==='brush'){ drawEmojiOverlay(ctx, '🪥', 4+Math.sin(action.progress*Math.PI*12)*8, 8, 26, 1); if(action.progress>0.8) drawEmojiOverlay(ctx, '✨', 20, -14, 18, 1); }
@@ -917,7 +984,7 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
     let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,50,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige === 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else if(opts.prestige >= 4) { a1 = `hsla(${(bounceTime*60)%360},100%,55%,0.8)`; a2 = 'rgba(0,0,0,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
@@ -941,7 +1008,7 @@ function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
   ctx.strokeStyle='#2a2a1a'; ctx.lineWidth=1.6; ctx.lineCap='round'; ctx.beginPath();
   if(asleep){ ctx.moveTo(headX+3,mouthY+1); ctx.lineTo(headX+11,mouthY+1); } else if(annoyed){ ctx.moveTo(headX+2,mouthY+3); ctx.quadraticCurveTo(headX+8,mouthY-2,headX+14,mouthY+1); } else { ctx.moveTo(headX+2,mouthY); ctx.quadraticCurveTo(headX+8,mouthY+4,headX+14,mouthY); } ctx.stroke();
   if(!asleep && !annoyed && Math.sin(bounceTime*2.6) > 0.65){ ctx.strokeStyle='#c73c5a'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(headX+headR*0.95, headY+6); ctx.lineTo(headX+headR*1.35, headY+6); ctx.lineTo(headX+headR*1.55, headY+2); ctx.moveTo(headX+headR*1.35, headY+6); ctx.lineTo(headX+headR*1.55, headY+10); ctx.stroke(); }
-  if (opts.prestige >= 3 && !asleep) { ctx.save(); const haloY = headY - headR - 10 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(headX, haloY, headR * 0.8, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  if (opts.prestige >= 3 && !asleep) { ctx.save(); const haloY = headY - headR - 10 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = opts.prestige >= 4 ? `hsla(${(bounceTime*60)%360},100%,60%,0.85)` : 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(headX, haloY, headR * 0.8, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
 
   drawReptileActionOverlays(ctx, baseSpecies, opts, t, headX, headY, headR, mouthX, mouthY); ctx.restore();
 }
@@ -960,16 +1027,8 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   if (opts.prestige > 0) {
     const auraR = 80 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 10, auraR * 0.3, 0, 10, auraR);
     let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
-    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige >= 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige === 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else if(opts.prestige >= 4) { a1 = `hsla(${(bounceTime*60)%360},100%,55%,0.8)`; a2 = 'rgba(0,0,0,0)'; } else { a1 = 'rgba(255,0,50,0.8)'; a2 = 'rgba(0,0,0,0)'; }
     grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 10, auraR, 0, Math.PI * 2); ctx.fill();
-  }
-
-  const isAxolotl = baseSpecies === 'axolotl' || (speciesKey==='hybrid' && opts.hybridDNA && opts.hybridDNA.base==='axolotl');
-  const tankX = -110, tankY = -45, tankW = 210, tankH = 90;
-  if(isAxolotl) {
-    ctx.save(); ctx.translate(0, -bounce); ctx.fillStyle = 'rgba(100, 200, 255, 0.25)'; ctx.fillRect(tankX, tankY, tankW, tankH); ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    for(let i=0; i<6; i++) { const bx = tankX + 10 + i*35; const by = tankY + tankH - ((bounceTime * 15 + i*20) % tankH); ctx.beginPath(); ctx.arc(bx, by, 2+(i%2)*2, 0, Math.PI*2); ctx.fill(); }
-    ctx.restore();
   }
 
   drawTaperedPath(ctx, [ { x:-40, y:6, r:5 }, { x:-68, y:-2, r:9 }, { x:-92, y:4, r:6 } ], colors.body);
@@ -979,11 +1038,6 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   ctx.beginPath(); ctx.ellipse(-4, 10, 30, 10, 0, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
 
   const headX = 44, headY = -2; const headR = 22;
-  if(isAxolotl && STAGE_PROFILE[stage].features) {
-    ctx.strokeStyle = colors.ear; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    [-1,1].forEach(dir => { for(let i=0; i<3; i++) { ctx.beginPath(); ctx.moveTo(headX + dir*headR*0.75, headY - 4 + i*8); ctx.lineTo(headX + dir*(headR + 10), headY - 12 + i*10); ctx.stroke(); } });
-  }
-
   ctx.beginPath(); ctx.ellipse(headX, headY, headR, headR*0.8, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
   ctx.fillStyle = colors.pattern; [[headX-6,headY-6],[headX+6,headY+4]].forEach(([sx,sy])=>{ ctx.beginPath(); ctx.ellipse(sx,sy,2.6,2,0.4,0,Math.PI*2); ctx.fill(); });
 
@@ -1007,13 +1061,431 @@ function drawGeckoCreature(ctx, speciesKey, stage, opts={}){
   ctx.strokeStyle='#3a2a1a'; ctx.lineWidth=1.6; ctx.lineCap='round'; ctx.beginPath();
   if(asleep){ ctx.moveTo(mouthX-6,mouthY); ctx.lineTo(mouthX+4,mouthY); } else if(annoyed){ ctx.moveTo(mouthX-8,mouthY+3); ctx.quadraticCurveTo(mouthX,mouthY-3,mouthX+8,mouthY+1); } else { ctx.moveTo(mouthX-8,mouthY-1); ctx.quadraticCurveTo(mouthX,mouthY+4,mouthX+8,mouthY-1); } ctx.stroke();
 
-  if(isAxolotl) {
-    ctx.save(); ctx.translate(0, -bounce); ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.moveTo(tankX, tankY); ctx.lineTo(tankX+50, tankY); ctx.lineTo(tankX, tankY+80); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tankX, tankY+10); ctx.lineTo(tankX+tankW, tankY+10); ctx.stroke(); ctx.strokeStyle = 'rgba(150,220,255,0.6)'; ctx.lineWidth = 5; ctx.strokeRect(tankX, tankY, tankW, tankH); ctx.restore();
+  if (opts.prestige >= 3 && !asleep) { ctx.save(); const haloY = headY - headR - 10 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = opts.prestige >= 4 ? `hsla(${(bounceTime*60)%360},100%,60%,0.85)` : 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(headX, haloY, headR * 0.8, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, headX, headY, headR, mouthX, mouthY); ctx.restore();
+}
+
+function drawSlimeCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['slime']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const wobble = (asleep || action) ? 0 : Math.sin(bounceTime*2.4)*6;
+
+  ctx.save(); ctx.translate(180+t.extraTX, 235+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  if (opts.prestige > 0) {
+    const auraR = 85 + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, 0, auraR * 0.3, 0, 0, auraR);
+    let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,50,0,0)';
+    if(opts.prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; } else if(opts.prestige === 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; } else if(opts.prestige >= 4) { a1 = `hsla(${(bounceTime*60)%360},100%,55%,0.8)`; a2 = 'rgba(0,0,0,0)'; }
+    grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, auraR, 0, Math.PI * 2); ctx.fill();
   }
 
-  if (opts.prestige >= 3 && !asleep) { ctx.save(); const haloY = headY - headR - 10 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(headX, haloY, headR * 0.8, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
-  drawReptileActionOverlays(ctx, baseSpecies, opts, t, headX, headY, headR, mouthX, mouthY); ctx.restore();
+  const squish = asleep ? 0.85 : 1 + Math.sin(bounceTime*2.4)*0.05;
+  const bodyR = 62;
+  ctx.beginPath();
+  ctx.moveTo(-bodyR, 10 + wobble*0.2);
+  ctx.bezierCurveTo(-bodyR, -bodyR*squish, bodyR, -bodyR*squish, bodyR, 10 + wobble*0.2);
+  ctx.quadraticCurveTo(bodyR*0.7, 34+wobble, 0, 30+wobble*0.6);
+  ctx.quadraticCurveTo(-bodyR*0.7, 34+wobble, -bodyR, 10 + wobble*0.2);
+  ctx.closePath();
+  const grad2 = ctx.createLinearGradient(0,-bodyR,0,30);
+  grad2.addColorStop(0, 'rgba(255,255,255,0.5)'); grad2.addColorStop(0.4, colors.body); grad2.addColorStop(1, colors.pattern);
+  ctx.fillStyle = grad2; ctx.globalAlpha = 0.88; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  [[-20,-10,6],[16,-24,4],[-6,4,5]].forEach(([bx,by,br])=>{ ctx.beginPath(); ctx.arc(bx,by,br,0,Math.PI*2); ctx.fill(); });
+
+  const eyeY = -6, eyeDX = 18, eyeR = 8; const closedEyes = asleep;
+  if(closedEyes){
+    ctx.strokeStyle='#1a3a2a'; ctx.lineWidth=3; ctx.lineCap='round';
+    [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-6,eyeY); ctx.quadraticCurveTo(dir*eyeDX,eyeY+5,dir*eyeDX+6,eyeY); ctx.stroke(); });
+  } else {
+    [-1,1].forEach(dir=>{
+      ctx.beginPath(); ctx.arc(dir*eyeDX,eyeY,eyeR,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(dir*eyeDX+(annoyed?0:1.5), eyeY+(annoyed?2:1), eyeR*0.55,0,Math.PI*2); ctx.fillStyle='#1a3a2a'; ctx.fill();
+    });
+  }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=2.5; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-8,eyeY-14); ctx.lineTo(dir*eyeDX+8,eyeY-9); ctx.stroke(); }); }
+
+  ctx.strokeStyle='#1a3a2a'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
+  if(asleep){ ctx.moveTo(-5,10); ctx.lineTo(5,10); } else if(annoyed){ ctx.moveTo(-8,13); ctx.quadraticCurveTo(0,7,8,11); } else { ctx.moveTo(-8,9); ctx.quadraticCurveTo(0,17,8,9); }
+  ctx.stroke();
+
+  if (opts.prestige >= 3 && !asleep) { ctx.save(); const haloY = -bodyR - 14 + Math.sin(bounceTime * 2) * 5; ctx.strokeStyle = opts.prestige >= 4 ? `hsla(${(bounceTime*60)%360},100%,60%,0.85)` : 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(0, haloY, 40, 7, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, 0, eyeY, 40, 0, 20);
+  ctx.restore();
+}
+
+function drawPrestigeAura(ctx, cy, r, prestige){
+  if(prestige <= 0) return;
+  const auraR = r + Math.sin(bounceTime * 5) * 10; const grad = ctx.createRadialGradient(0, cy, auraR * 0.3, 0, cy, auraR);
+  let a1 = 'rgba(255,200,0,0.7)', a2 = 'rgba(255,100,0,0)';
+  if(prestige === 2) { a1 = 'rgba(0,200,255,0.7)'; a2 = 'rgba(0,50,255,0)'; }
+  else if(prestige === 3) { a1 = 'rgba(200,0,255,0.7)'; a2 = 'rgba(100,0,255,0)'; }
+  else if(prestige >= 4) { a1 = `hsla(${(bounceTime*60)%360},100%,55%,0.8)`; a2 = 'rgba(0,0,0,0)'; }
+  grad.addColorStop(0, a1); grad.addColorStop(1, a2); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, cy, auraR, 0, Math.PI * 2); ctx.fill();
+}
+function drawPrestigeHalo(ctx, haloY, rx, ry, prestige){
+  if(prestige < 3) return;
+  ctx.save(); const y = haloY + Math.sin(bounceTime * 2) * 5;
+  ctx.strokeStyle = prestige >= 4 ? `hsla(${(bounceTime*60)%360},100%,60%,0.85)` : 'rgba(255, 215, 0, 0.8)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(0, y, rx, ry, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+}
+
+function drawAlienCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['alien']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*4;
+
+  ctx.save(); ctx.translate(180+t.extraTX, 210+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, 20, 95, opts.prestige || 0);
+
+  ctx.beginPath(); ctx.ellipse(0, 58, 20, 28, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 62, 12, 16, 0, 0, Math.PI*2); ctx.fillStyle = colors.pattern; ctx.globalAlpha = 0.3; ctx.fill(); ctx.globalAlpha = 1;
+
+  [-1,1].forEach(dir=>{
+    ctx.beginPath(); ctx.moveTo(dir*16, 42); ctx.quadraticCurveTo(dir*38, 55, dir*30, 84); ctx.lineWidth=7; ctx.strokeStyle=colors.body; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(dir*13, 82); ctx.lineTo(dir*18, 106); ctx.lineWidth=6; ctx.strokeStyle=colors.body; ctx.lineCap='round'; ctx.stroke();
+  });
+
+  ctx.beginPath(); ctx.moveTo(-16,18); ctx.lineTo(16,18); ctx.lineTo(11,38); ctx.lineTo(-11,38); ctx.closePath(); ctx.fillStyle = colors.body; ctx.fill();
+
+  ctx.strokeStyle = colors.body; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  [-1,1].forEach(dir=>{ ctx.save(); ctx.translate(dir*14, -64); ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(dir*16,-12,dir*11,-28); ctx.stroke(); ctx.beginPath(); ctx.arc(dir*11,-28,5,0,Math.PI*2); ctx.fillStyle=colors.ear; ctx.fill(); ctx.restore(); });
+
+  const closedEyes = asleep;
+  ctx.beginPath();
+  ctx.moveTo(0,-70); ctx.bezierCurveTo(36,-70, 44,-22, 28,14); ctx.bezierCurveTo(18,30, -18,30, -28,14); ctx.bezierCurveTo(-44,-22, -36,-70, 0,-70); ctx.closePath();
+  ctx.fillStyle = colors.body; ctx.fill();
+
+  const eyeY = -18, eyeDX = 16;
+  if(closedEyes){
+    ctx.strokeStyle='#0a1f0a'; ctx.lineWidth=3; ctx.lineCap='round';
+    [-1,1].forEach(dir=>{ ctx.save(); ctx.translate(dir*eyeDX, eyeY); ctx.rotate(dir*0.3); ctx.beginPath(); ctx.moveTo(-11,0); ctx.quadraticCurveTo(0,6,11,0); ctx.stroke(); ctx.restore(); });
+  } else {
+    [-1,1].forEach(dir=>{
+      ctx.save(); ctx.translate(dir*eyeDX, eyeY); ctx.rotate(dir*0.35);
+      ctx.beginPath(); ctx.ellipse(0,0,14,8.5,0,0,Math.PI*2); ctx.fillStyle='#0a1f0a'; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(-3+(annoyed?0:0), -2,4,2.5,0,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.fill();
+      ctx.restore();
+    });
+  }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2.5; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-13, eyeY-14); ctx.lineTo(dir*eyeDX+9, eyeY-8); ctx.stroke(); }); }
+
+  ctx.strokeStyle='#3a5a2a'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.beginPath();
+  if(asleep){ ctx.moveTo(-5,13); ctx.lineTo(5,13); } else if(annoyed){ ctx.moveTo(-6,16); ctx.quadraticCurveTo(0,10,6,14); } else { ctx.moveTo(-6,12); ctx.quadraticCurveTo(0,17,6,12); }
+  ctx.stroke();
+
+  drawPrestigeHalo(ctx, -95, 30, 6, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, 0, eyeY, 40, 0, 14);
+  ctx.restore();
+}
+
+function drawRobotCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['robot']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*1.6)*3;
+
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  ctx.save(); ctx.translate(180+t.extraTX, 200+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, 40, 95, opts.prestige || 0);
+
+  roundRect(-30,30,60,54,10); ctx.fillStyle = colors.body; ctx.fill(); ctx.strokeStyle=colors.pattern; ctx.lineWidth=2; ctx.stroke();
+  const chestOn = Math.sin(bounceTime*4) > 0.3;
+  ctx.beginPath(); ctx.arc(0,55,6,0,Math.PI*2); ctx.fillStyle = chestOn ? colors.ear : colors.pattern; if(chestOn){ ctx.shadowColor = colors.ear; ctx.shadowBlur = 10; } ctx.fill(); ctx.shadowBlur = 0;
+
+  [-1,1].forEach(dir=>{ roundRect(dir>0?30:-38, 38, 8, 38, 4); ctx.fillStyle=colors.pattern; ctx.fill(); ctx.beginPath(); ctx.arc(dir*34, 80, 7, 0, Math.PI*2); ctx.fillStyle=colors.body; ctx.fill(); });
+  [-1,1].forEach(dir=>{ roundRect(dir*18-6, 82, 12, 22, 3); ctx.fillStyle=colors.pattern; ctx.fill(); });
+
+  roundRect(-9,4,18,28,3); ctx.fillStyle = colors.pattern; ctx.fill();
+
+  ctx.strokeStyle=colors.pattern; ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,-36); ctx.lineTo(0,-54); ctx.stroke();
+  const tipOn = Math.sin(bounceTime*6) > 0.4;
+  ctx.beginPath(); ctx.arc(0,-54,5,0,Math.PI*2); ctx.fillStyle = tipOn ? colors.ear : 'rgba(0,0,0,0.3)'; if(tipOn){ ctx.shadowColor = colors.ear; ctx.shadowBlur = 10; } ctx.fill(); ctx.shadowBlur = 0;
+
+  roundRect(-26,-36,52,44,8); ctx.fillStyle = colors.body; ctx.fill(); ctx.strokeStyle=colors.pattern; ctx.lineWidth=2; ctx.stroke();
+  roundRect(-20,-30,40,32,5); ctx.fillStyle='#0d1520'; ctx.fill();
+
+  const closedEyes = asleep; const eyeY = -14, eyeDX = 10;
+  if(closedEyes){
+    ctx.strokeStyle = colors.ear; ctx.lineWidth = 2; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-5,eyeY); ctx.lineTo(dir*eyeDX+5,eyeY); ctx.stroke(); });
+  } else {
+    [-1,1].forEach(dir=>{
+      ctx.fillStyle='#1c2530'; ctx.fillRect(dir*eyeDX-6, eyeY-4, 12, 8);
+      ctx.fillStyle = colors.ear; ctx.shadowColor = colors.ear; ctx.shadowBlur = 8;
+      ctx.fillRect(dir*eyeDX-3+(annoyed?0:1), eyeY-2, 6, 4); ctx.shadowBlur = 0;
+    });
+  }
+  ctx.strokeStyle = colors.ear; ctx.lineWidth = 1.5;
+  for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(-8, 0+i*3); ctx.lineTo(8, 0+i*3); ctx.stroke(); }
+
+  drawPrestigeHalo(ctx, -62, 22, 5, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, 0, eyeY, 26, 0, 0);
+  ctx.restore();
+}
+
+function drawGolemCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['golem']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*1.4)*2;
+
+  function crystal(cx,cy,w,h,rot,fill){ ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot); ctx.beginPath(); ctx.moveTo(0,-h/2); ctx.lineTo(w/2,0); ctx.lineTo(0,h/2); ctx.lineTo(-w/2,0); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.restore(); }
+  function hexBlock(cx,cy,w,h,rot,fill){ ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot||0); ctx.beginPath(); ctx.moveTo(-w*0.3,-h/2); ctx.lineTo(w*0.3,-h/2); ctx.lineTo(w/2,0); ctx.lineTo(w*0.3,h/2); ctx.lineTo(-w*0.3,h/2); ctx.lineTo(-w/2,0); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5; ctx.stroke(); ctx.restore(); }
+
+  ctx.save(); ctx.translate(180+t.extraTX, 200+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, 55, 95, opts.prestige || 0);
+
+  [-1,1].forEach(dir=>{ hexBlock(dir*22, 100, 20, 32, 0, colors.pattern); });
+  hexBlock(0, 62, 66, 60, 0, colors.body);
+  crystal(0, 55, 30, 34, 0, colors.pattern);
+  [-1,1].forEach(dir=>{ hexBlock(dir*44, 62, 20, 46, dir*0.15, colors.body); });
+  hexBlock(0, 20, 30, 22, 0, colors.body);
+  hexBlock(0, -4, 50, 44, 0, colors.body);
+  crystal(0, -4, 24, 24, Math.PI/4, colors.pattern);
+
+  const closedEyes = asleep; const eyeY = -4, eyeDX = 12;
+  const glow = 0.6 + Math.sin(bounceTime*2)*0.3;
+  if(closedEyes){
+    ctx.strokeStyle='rgba(20,20,40,0.8)'; ctx.lineWidth=2; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-5,eyeY); ctx.lineTo(dir*eyeDX+5,eyeY); ctx.stroke(); });
+  } else {
+    [-1,1].forEach(dir=>{ ctx.save(); ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 10*glow; ctx.beginPath(); ctx.arc(dir*eyeDX, eyeY, 6, 0, Math.PI*2); ctx.fillStyle = 'rgba(30,20,50,0.9)'; ctx.fill(); ctx.beginPath(); ctx.arc(dir*eyeDX, eyeY, 3.2, 0, Math.PI*2); ctx.fillStyle = '#ffffff'; ctx.globalAlpha = glow; ctx.fill(); ctx.restore(); });
+  }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2.5; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-9, eyeY-14); ctx.lineTo(dir*eyeDX+9, eyeY-9); ctx.stroke(); }); }
+
+  ctx.strokeStyle='rgba(20,20,40,0.8)'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
+  if(asleep){ ctx.moveTo(-5,16); ctx.lineTo(5,16); } else if(annoyed){ ctx.moveTo(-7,19); ctx.quadraticCurveTo(0,13,7,17); } else { ctx.moveTo(-7,15); ctx.quadraticCurveTo(0,20,7,15); }
+  ctx.stroke();
+
+  const sp2 = Math.sin(bounceTime*2 + 1);
+  if(sp2 > 0.7){ ctx.save(); ctx.globalAlpha = (sp2-0.7)/0.3; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(-14,-14,2,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+
+  drawPrestigeHalo(ctx, -34, 22, 5, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, 0, eyeY, 24, 0, 16);
+  ctx.restore();
+}
+
+function drawKrakenCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['kraken']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*2)*5;
+
+  ctx.save(); ctx.translate(180+t.extraTX, 175+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, 30, 100, opts.prestige || 0);
+
+  const tentCount = 5;
+  for(let i=0;i<tentCount;i++){
+    const spread = (i/(tentCount-1) - 0.5) * 2.4;
+    const sway = asleep ? 0 : Math.sin(bounceTime*2.4 + i)*14;
+    ctx.beginPath(); ctx.moveTo(spread*14, 40);
+    ctx.bezierCurveTo(spread*30+sway, 75, spread*14-sway, 100, spread*40+sway*1.3, 132);
+    ctx.lineWidth = 11-i; ctx.strokeStyle = colors.body; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(spread*40+sway*1.3, 132, (11-i)*0.45, 0, Math.PI*2); ctx.fillStyle = colors.pattern; ctx.fill();
+  }
+
+  ctx.beginPath(); ctx.ellipse(0, 0, 52, 60, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
+  ctx.fillStyle = colors.pattern; ctx.globalAlpha = 0.5;
+  [[-22,-16,7],[18,-4,6],[-8,20,6],[20,26,5]].forEach(([sx,sy,sr])=>{ ctx.beginPath(); ctx.arc(sx,sy,sr,0,Math.PI*2); ctx.fill(); });
+  ctx.globalAlpha = 1;
+
+  const closedEyes = asleep; const eyeY = -8, eyeDX = 19, eyeR = 11;
+  if(closedEyes){
+    ctx.strokeStyle='#160a2a'; ctx.lineWidth=3; ctx.lineCap='round';
+    [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-9,eyeY); ctx.quadraticCurveTo(dir*eyeDX,eyeY+6,dir*eyeDX+9,eyeY); ctx.stroke(); });
+  } else {
+    [-1,1].forEach(dir=>{
+      ctx.beginPath(); ctx.ellipse(dir*eyeDX, eyeY, eyeR, eyeR*1.3, 0, 0, Math.PI*2); ctx.fillStyle='#e8dcff'; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(dir*eyeDX+(annoyed?0:1.5), eyeY+(annoyed?2:1), 3, eyeR*1.1, 0, 0, Math.PI*2); ctx.fillStyle='#160a2a'; ctx.fill();
+    });
+  }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2.5; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-12, eyeY-18); ctx.lineTo(dir*eyeDX+10, eyeY-12); ctx.stroke(); }); }
+
+  ctx.strokeStyle='#160a2a'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
+  if(asleep){ ctx.moveTo(-6,26); ctx.lineTo(6,26); } else if(annoyed){ ctx.moveTo(-9,30); ctx.quadraticCurveTo(0,22,9,28); } else { ctx.moveTo(-9,24); ctx.quadraticCurveTo(0,34,9,24); }
+  ctx.stroke();
+
+  if(!asleep){
+    const kb = (bounceTime*0.5) % 1;
+    if(kb < 0.3){ const p = kb/0.3; ctx.save(); ctx.globalAlpha = (1-p)*0.5; ctx.fillStyle = 'rgba(200,200,255,0.7)'; ctx.beginPath(); ctx.arc(0, 40+p*20, 2+p*4, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  }
+
+  drawPrestigeHalo(ctx, -66, 34, 7, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, 0, eyeY, 40, 0, 22);
+  ctx.restore();
+}
+
+function drawYetiCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['yeti']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*1.6)*3;
+
+  ctx.save(); ctx.translate(180+t.extraTX, 195+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, 50, 105, opts.prestige || 0);
+
+  [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.ellipse(dir*22, 108, 16, 20, 0, 0, Math.PI*2); ctx.fillStyle = colors.body; ctx.fill(); ctx.beginPath(); ctx.ellipse(dir*22, 122, 18, 10, 0, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill(); });
+
+  [-1,1].forEach(dir=>{
+    ctx.beginPath(); ctx.moveTo(dir*36, 30); ctx.quadraticCurveTo(dir*62, 70, dir*46, 120); ctx.lineWidth=20; ctx.strokeStyle=colors.body; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(dir*46, 122, 12, 9, 0, 0, Math.PI*2); ctx.fillStyle=colors.body; ctx.fill();
+  });
+
+  ctx.beginPath(); ctx.moveTo(-46,90); ctx.quadraticCurveTo(-52,20,-24,4); ctx.quadraticCurveTo(0,-6,24,4); ctx.quadraticCurveTo(52,20,46,90); ctx.quadraticCurveTo(0,104,-46,90); ctx.closePath();
+  ctx.fillStyle = colors.body; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,60,26,32,0,0,Math.PI*2); ctx.fillStyle=colors.pattern; ctx.globalAlpha=0.35; ctx.fill(); ctx.globalAlpha=1;
+
+  ctx.fillStyle = colors.ear;
+  for(let i=0;i<7;i++){ const ang=(i/6)*Math.PI - Math.PI/2; const ex = Math.sin(ang)*48, ey=40+Math.cos(ang)*46; ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ex+6,ey-10); ctx.lineTo(ex-2,ey-4); ctx.closePath(); ctx.fill(); }
+
+  const headR = 30;
+  ctx.beginPath(); ctx.arc(0,-18,headR,0,Math.PI*2); ctx.fillStyle=colors.body; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,-30,26,10,0,0,Math.PI*2); ctx.fillStyle=colors.body; ctx.fill();
+
+  const closedEyes = asleep; const eyeY=-22, eyeDX=12;
+  if(closedEyes){
+    ctx.strokeStyle='#3a4a5a'; ctx.lineWidth=2.5; ctx.lineCap='round';
+    [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-6,eyeY); ctx.quadraticCurveTo(dir*eyeDX,eyeY+5,dir*eyeDX+6,eyeY); ctx.stroke(); });
+  } else {
+    [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.arc(dir*eyeDX,eyeY,6,0,Math.PI*2); ctx.fillStyle='#1a2a3a'; ctx.fill();
+      ctx.beginPath(); ctx.arc(dir*eyeDX+(annoyed?0:1), eyeY+(annoyed?1:0),2.2,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.fill(); });
+  }
+  ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=3; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-8,eyeY-9); ctx.lineTo(dir*eyeDX+6,eyeY-6); ctx.stroke(); });
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2.5; [-1,1].forEach(dir=>{ ctx.beginPath(); ctx.moveTo(dir*eyeDX-8,eyeY-12); ctx.lineTo(dir*eyeDX+6,eyeY-9); ctx.stroke(); }); }
+
+  ctx.strokeStyle='#3a4a5a'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.beginPath();
+  if(asleep){ ctx.moveTo(-5,-2); ctx.lineTo(5,-2); } else if(annoyed){ ctx.moveTo(-7,1); ctx.quadraticCurveTo(0,-5,7,-1); } else { ctx.moveTo(-7,-4); ctx.quadraticCurveTo(0,3,7,-4); }
+  ctx.stroke();
+
+  if(!asleep){
+    const bp2 = (bounceTime*0.4) % 1;
+    if(bp2 < 0.4){ const p = bp2/0.4; ctx.save(); ctx.globalAlpha = (1-p)*0.6; ctx.fillStyle = 'rgba(220,240,255,0.9)'; ctx.beginPath(); ctx.arc(14, -6-p*10, 2+p*5, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
+  }
+
+  drawPrestigeHalo(ctx, -56, 26, 6, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, 0, eyeY, headR, 0, -4);
+  ctx.restore();
+}
+
+function drawPhoenixCreature(ctx, speciesKey, stage, opts={}){
+  let baseSpecies = speciesKey; if(speciesKey === 'hybrid' && opts.hybridDNA) baseSpecies = opts.hybridDNA.base;
+  const sp = SPECIES[baseSpecies] || SPECIES['phoenix']; const colors = opts.colors || sp; const scale = STAGE_SCALE[stage];
+  const asleep = opts.asleep; const sad = opts.sad; const action = opts.action; const yaw = opts.yaw || 0;
+  const annoyed = sad || (action && action.type==='refuse') || (opts.prestige > 0 && !asleep);
+  const t = computeSharedTransform(opts); const bounce = (asleep || action) ? 0 : Math.sin(bounceTime*1.8)*6;
+
+  ctx.save(); ctx.translate(180+t.extraTX, 190+bounce+t.extraTY);
+  if(opts.prestige > 0 && !asleep) ctx.translate(0, -Math.abs(Math.sin(bounceTime*2)) * 10 - (opts.prestige * 5));
+  ctx.rotate(t.extraRotate); ctx.scale(scale*t.extraScaleX*t.pulseScale*Math.cos(yaw), scale*t.extraScaleY*t.pulseScale);
+
+  drawPrestigeAura(ctx, -10, 130, opts.prestige || 0);
+  const emberGlow = ctx.createRadialGradient(0,-10,20,0,-10,140);
+  emberGlow.addColorStop(0, asleep ? 'rgba(255,140,40,0.12)' : 'rgba(255,140,40,0.22)'); emberGlow.addColorStop(1,'rgba(255,80,20,0)');
+  ctx.fillStyle = emberGlow; ctx.beginPath(); ctx.arc(0,-10,140,0,Math.PI*2); ctx.fill();
+
+  function flameGrad(x0,y0,x1,y1){ const g = ctx.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'#ffd23f'); g.addColorStop(0.45,colors.body); g.addColorStop(1,'rgba(200,30,30,0)'); return g; }
+
+  const tailSway = asleep ? 0 : Math.sin(bounceTime*1.4)*0.12;
+  for(let i=-2;i<=2;i++){
+    const spread = i*0.22 + tailSway*(1-Math.abs(i)*0.2);
+    const len = 72 - Math.abs(i)*8;
+    ctx.save(); ctx.rotate(spread);
+    ctx.beginPath(); ctx.moveTo(-4,40); ctx.quadraticCurveTo(6,40+len*0.5, i*6,40+len);
+    ctx.quadraticCurveTo(-2,40+len*0.6,4,40); ctx.closePath();
+    ctx.fillStyle = flameGrad(0,45,0,40+len); ctx.fill();
+    ctx.restore();
+  }
+
+  const wingFlap = asleep ? 0.05 : 0.18+Math.sin(bounceTime*2.6)*0.14;
+  [-1,1].forEach(dir=>{
+    ctx.save(); ctx.translate(dir*16,-2); ctx.rotate(dir*(0.35+wingFlap));
+    [0,1,2].forEach(layer=>{
+      const l = 70 - layer*14, w = 34 - layer*6;
+      ctx.beginPath(); ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(dir*l*0.6,-w*0.3-layer*4,dir*l,6+layer*10);
+      ctx.quadraticCurveTo(dir*l*0.5,w*0.4+layer*8,dir*8,10+layer*6);
+      ctx.closePath();
+      ctx.fillStyle = flameGrad(0,0,dir*l,10); ctx.globalAlpha = 1-layer*0.18; ctx.fill(); ctx.globalAlpha=1;
+    });
+    ctx.restore();
+  });
+
+  [-1,1].forEach(dir=>{
+    ctx.beginPath(); ctx.moveTo(dir*7,58); ctx.lineTo(dir*7,84); ctx.lineWidth=4; ctx.strokeStyle=colors.ear; ctx.lineCap='round'; ctx.stroke();
+    for(let c=-1;c<=1;c++){ ctx.beginPath(); ctx.moveTo(dir*7,84); ctx.lineTo(dir*7+c*6,92); ctx.lineWidth=2.5; ctx.strokeStyle=colors.ear; ctx.lineCap='round'; ctx.stroke(); }
+  });
+
+  ctx.beginPath(); ctx.moveTo(0,-28); ctx.bezierCurveTo(26,-20,30,20,16,52); ctx.quadraticCurveTo(0,64,-16,52); ctx.bezierCurveTo(-30,20,-26,-20,0,-28); ctx.closePath();
+  const bodyGrad = ctx.createLinearGradient(0,-28,0,60); bodyGrad.addColorStop(0,'#ffd23f'); bodyGrad.addColorStop(0.5,colors.body); bodyGrad.addColorStop(1,colors.pattern);
+  ctx.fillStyle = bodyGrad; ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5;
+  for(let r=0;r<3;r++){ ctx.beginPath(); ctx.arc(0,10+r*14,20-r*4,0.3*Math.PI,0.7*Math.PI); ctx.stroke(); }
+
+  drawTaperedPath(ctx, [ {x:2,y:-26,r:12}, {x:6,y:-36,r:9}, {x:10,y:-46,r:7} ], colors.body);
+
+  const headCX = 13, headCY = -56, headR = 16;
+  ctx.fillStyle = colors.ear;
+  [0,1,2,3].forEach(i=>{
+    const a = -0.3 - i*0.35;
+    ctx.save(); ctx.translate(headCX-4,headCY-6); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(-6,-14-i*4,3-i*2,-30-i*5); ctx.quadraticCurveTo(5,-14-i*3,8,0); ctx.closePath();
+    const cg = ctx.createLinearGradient(0,0,0,-30-i*5); cg.addColorStop(0,colors.ear); cg.addColorStop(1,'rgba(255,80,40,0.15)');
+    ctx.fillStyle = cg; ctx.fill(); ctx.restore();
+  });
+
+  ctx.beginPath(); ctx.arc(headCX,headCY,headR,0,Math.PI*2); ctx.fillStyle = colors.body; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(headCX+headR-2,headCY-2); ctx.quadraticCurveTo(headCX+headR+14,headCY,headCX+headR+2,headCY+5); ctx.quadraticCurveTo(headCX+headR+8,headCY+2,headCX+headR-4,headCY+4); ctx.closePath();
+  ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.strokeStyle='rgba(180,100,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
+
+  const closedEyes = asleep; const eyeCX = headCX+3, eyeCY = headCY-3;
+  if(closedEyes){
+    ctx.strokeStyle='#7a2010'; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(eyeCX-4,eyeCY); ctx.quadraticCurveTo(eyeCX,eyeCY+4,eyeCX+4,eyeCY); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.ellipse(eyeCX,eyeCY,5,6,0,0,Math.PI*2); ctx.fillStyle='#ffd23f'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(eyeCX+(annoyed?0:0.6),eyeCY+(annoyed?0.6:0),1.6,4.2,0,0,Math.PI*2); ctx.fillStyle='#2a0a05'; ctx.fill();
+  }
+  if(annoyed && !closedEyes){ ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(eyeCX-6,eyeCY-8); ctx.lineTo(eyeCX+5,eyeCY-5); ctx.stroke(); }
+
+  if(!asleep){
+    for(let i=0;i<4;i++){
+      const ph = ((bounceTime*0.4)+i*0.27) % 1; const ex = -20+i*14 + Math.sin(bounceTime*2+i)*8; const ey = 30 - ph*140;
+      ctx.save(); ctx.globalAlpha = (1-ph)*0.7; ctx.fillStyle = i%2? '#ffd23f' : colors.body; ctx.beginPath(); ctx.arc(ex,ey,2.5-ph*1.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+  }
+
+  drawPrestigeHalo(ctx, headCY-30, 20, 5, opts.prestige || 0);
+  drawReptileActionOverlays(ctx, baseSpecies, opts, t, headCX, headCY, headR, headCX+10, headCY+8);
+  ctx.restore();
 }
 
 /* ---------- Events & Actions ---------- */
@@ -1185,6 +1657,18 @@ function tick(){
     applyElapsed(); refreshStatBars(); const stage = getStage();
     if(lastStageSeen && stage !== lastStageSeen){ SFX.grow(); toast(`${SPECIES[state.species] ? SPECIES[state.species].name : 'Hybriden'} har vokst! 🌱`); spawnSparkles(14); growthPulseUntil = performance.now() + 700; }
     lastStageSeen = stage;
+
+    if(!state.sleeping && !getActionProgress() && Date.now() > nextIdleReactionAt){
+      nextIdleReactionAt = Date.now() + 25000 + Math.random()*35000;
+      const s = state.stats;
+      let emoji = '💭';
+      if(s.happiness >= 75) emoji = ['💖','✨','😊'][Math.floor(Math.random()*3)];
+      else if(s.hunger <= 40) emoji = '🍽️';
+      else if(s.energy <= 30) emoji = '😴';
+      else if(s.hygiene <= 40) emoji = '💦';
+      else emoji = ['👀','💭','🎶'][Math.floor(Math.random()*3)];
+      spawnEmojiBurst(emoji, 1);
+    }
 
     const canvas = document.getElementById('canvas-pet');
     if(canvas) {
