@@ -47,7 +47,8 @@ const SHOP_ITEMS = [
   { id:'bowtie', slot:'neck', name:'Sløyfe', emoji:'🎀', price:20 },
   { id:'scarf', slot:'neck', name:'Skjerf', emoji:'🧣', price:30 }, 
   { id:'bandana', slot:'neck', name:'Bandana', emoji:'🏴', price:25 },
-  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 }, 
+  { id:'necklace', slot:'neck', name:'Halskjede', emoji:'📿', price:55 },
+  { id:'teddybear', slot:'held', name:'Kosebamse', emoji:'🧸', price:50 },
   { id:'plant', slot:'plant', name:'Potteplante', emoji:'🪴', price:35 },
   { id:'plant2', slot:'plant2', name:'Kaktus', emoji:'🌵', price:30 }, 
   { id:'poster', slot:'poster', name:'Plakat', emoji:'🖼️', price:45 },
@@ -640,6 +641,34 @@ function drawNeckAccessory(ctx, id, originX=0, originY=0, scale=1){
   ctx.restore();
 }
 
+function drawHeldAccessory(ctx, id, originX=0, originY=0, scale=1){
+  ctx.save(); ctx.translate(originX, originY); ctx.scale(scale, scale);
+  switch(id){
+    case 'teddybear':
+      ctx.fillStyle='#a9714a';
+      ctx.beginPath(); ctx.ellipse(-11, 6, 5, 8, 0.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(11, 6, 5, 8, -0.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 10, 13, 15, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#d9a876';
+      ctx.beginPath(); ctx.ellipse(0, 12, 7, 9, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#a9714a';
+      ctx.beginPath(); ctx.arc(0, -10, 11, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-8, -18, 4.5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(8, -18, 4.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#7a4f30';
+      ctx.beginPath(); ctx.arc(-8, -18, 2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(8, -18, 2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#d9a876';
+      ctx.beginPath(); ctx.ellipse(0, -6, 5, 4, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#2a2018';
+      ctx.beginPath(); ctx.arc(-4, -11, 1.4, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(4, -11, 1.4, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, -6.5, 2, 1.4, 0, 0, Math.PI*2); ctx.fill();
+      break;
+  }
+  ctx.restore();
+}
+
 function drawEmojiOverlay(ctx, emoji, x, y, size, alpha=1){
   ctx.save(); ctx.globalAlpha = alpha; ctx.font = `${size}px "Segoe UI Emoji", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(emoji, x, y); ctx.restore();
 }
@@ -815,6 +844,7 @@ function drawReptileActionOverlays(ctx, speciesKey, opts, t, headX, headY, headR
   if(equipped && equipped.glasses) drawAccessory(ctx, equipped.glasses, headX, headY-headR*0.05, headR*0.42, hs*0.65);
   if(equipped && equipped.hat) drawAccessory(ctx, equipped.hat, headX, headY-headR*0.9, headR*0.42, hs*0.55);
   if(equipped && equipped.neck) drawNeckAccessory(ctx, equipped.neck, headX-15, headY+5, hs*0.6);
+  if(equipped && equipped.held) drawHeldAccessory(ctx, equipped.held, headX+headR*0.3, headY+headR*1.7, hs*0.55);
 }
 
 function drawSnakeCreature(ctx, speciesKey, stage, opts={}){
